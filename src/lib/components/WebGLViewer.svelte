@@ -189,8 +189,6 @@
         } else {
           dispatch('nodeClick', { nodeId, original: event });
         }
-        // Don't start dragging if we clicked a node
-        return;
       }
     }
 
