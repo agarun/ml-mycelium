@@ -16,6 +16,8 @@ declare type MyceliumStrict = Mycelium & {
   resetFocus: (transition?: boolean) => Promise<void>;
 };
 
+export type Renderer = 'svg' | 'webgl';
+
 /**
  * Represents an instance of the Mycelium viewer.
  */
@@ -34,6 +36,11 @@ export interface INetworkViewerOptions {
   layoutProvider: ILayoutProvider;
   autoResize: boolean;
   multiSelection: boolean;
+  /**
+   * Specifies which renderer to use. Defaults to 'svg'.
+   * @experimental
+   */
+  renderer: Renderer;
 }
 
 export class NetworkViewer {
@@ -65,6 +72,7 @@ export class NetworkViewer {
       minimap: true,
       layoutProvider: new DagreLayoutProvider(),
       multiSelection: true,
+      renderer: 'webgl',
       ...options,
     };
 

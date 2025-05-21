@@ -41,7 +41,12 @@
   const badgeOffset = { x: 1, y: 1 };
 </script>
 
-<g role="tooltip" on:mouseenter={handleMouseEnter} on:mouseleave={handleMouseLeave}>
+<g
+  role="tooltip"
+  class="myc-tooltip"
+  on:mouseenter={handleMouseEnter}
+  on:mouseleave={handleMouseLeave}
+>
   <svelte:component this={tooltip.content.drawable()} {...{ self: tooltip.content }} />
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <g

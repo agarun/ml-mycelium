@@ -5,9 +5,11 @@
 
 <script context="module" lang="ts">
   // For some reason, Eslint does not pick up the types with `strict-type-checked` enabled.
-  declare type SvgViewerStrict = SvgViewer & {
+  type Props = {
     setFocus: (boundingBox: Readonly<BoundingBox>, transition?: boolean) => Promise<void>;
   };
+  declare type SvgViewerStrict = SvgViewer & Props
+  declare type WebGLViewerStrict = WebGLViewer & Props
 </script>
 
 <script lang="ts">
@@ -18,6 +20,7 @@
     IEventNodes,
   } from '$lib/events';
   import SvgViewer from './SvgViewer.svelte';
+  import WebGLViewer from './WebGLViewer.svelte';
   import Minimap from './Minimap.svelte';
   import Breadcrumbs from './Breadcrumbs.svelte';
   import {
@@ -41,6 +44,7 @@
   } from './stores/tooltip';
   import type { IRectOptions } from '$lib/ui';
   import { BoundingBox } from '$lib/geometry/boundingBox';
+  import type { Renderer } from '$lib/viewer';
 
   export let network: Network;
   export let width: number;
@@ -51,6 +55,7 @@
   export let minimap: boolean;
   export let autoResize: boolean;
   export let multiSelection: boolean;
+  export let renderer: Renderer = 'svg';
   autoResize; // Fix unused variable warning.
 
   export let decorations: Map<NodeId, Partial<IRectOptions>> = new Map();
@@ -93,7 +98,7 @@
   let currentNodes: Array<NodeId> = [];
   $: currentNode = currentNodes.at(currentNodes.length - 1);
 
-  let viewer: SvgViewerStrict;
+  let viewer: SvgViewerStrict | WebGLViewerStrict;
 
   function padBreadcrumbs(boundingBox: BoundingBox): BoundingBox {
     const { yMin, yMax } = boundingBox;
@@ -284,13 +289,15 @@
       await updateSelections(new Map(e.detail.nodes.map((nodeId) => [nodeId, new Set()]))),
     );
   }
+
+  const Viewer = renderer === 'svg' ? SvgViewer : WebGLViewer;
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="myc-container">
   {#key network}
-    <SvgViewer
+    <Viewer
       bind:this={viewer}
       bind:viewport
       {decorations}

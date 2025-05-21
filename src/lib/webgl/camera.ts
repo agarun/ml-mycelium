@@ -1,0 +1,38 @@
+import * as THREE from 'three';
+import { Viewport } from '$lib/viewport';
+
+export class CameraManager {
+  public camera: THREE.OrthographicCamera;
+  private viewport: Viewport;
+
+  constructor(viewport: Viewport) {
+    this.viewport = viewport;
+    const aspect = viewport.screenWidth() / viewport.screenHeight();
+    const frustumSize = viewport.world().height;
+
+    this.camera = new THREE.OrthographicCamera(
+      (frustumSize * aspect) / -2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      frustumSize / -2,
+      1,
+      1000,
+    );
+    this.camera.position.z = 5;
+    this.update();
+  }
+
+  update(): void {
+    const { x, y } = this.viewport.center();
+    const scale = this.viewport.scale();
+    const aspect = this.viewport.screenWidth() / this.viewport.screenHeight();
+    const frustumSize = this.viewport.world().height / scale;
+
+    this.camera.left = (-frustumSize * aspect) / 2;
+    this.camera.right = (frustumSize * aspect) / 2;
+    this.camera.top = frustumSize / 2;
+    this.camera.bottom = -frustumSize / 2;
+    this.camera.position.set(x, y, 5);
+    this.camera.updateProjectionMatrix();
+  }
+}
