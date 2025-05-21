@@ -66,7 +66,7 @@
   "devDependencies": {
     "@playwright/test": "^1.44.1",
     "@steeze-ui/heroicons": "^2.3.0",
-    "@steeze-ui/svelte-icon": "^1.5.0",
+    "@steeze-ui/svelte-icon": "1.5.0",
     "@sveltejs/adapter-static": "^3.0.4",
     "@sveltejs/kit": "^2.5.26",
     "@sveltejs/vite-plugin-svelte": "^3.1.1",
@@ -98,11 +98,13 @@
     "typescript": "^5.4.5",
     "vite": "^5.4.3",
     "vite-plugin-dts": "^3.9.1",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "web-worker": "^1.5.0"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.2",
     "d3": "^7.9.0",
+    "elkjs": "^0.10.0",
     "protobufjs": "^7.3.2",
     "three": "^0.176.0",
     "troika-three-text": "^0.52.4",

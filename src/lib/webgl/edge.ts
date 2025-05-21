@@ -14,7 +14,7 @@ export class EdgeManager extends WebGLManager {
     super();
     this.material = new THREE.LineBasicMaterial({
       color: Theme.colors.foreground.grayTertiary,
-      linewidth: 1,
+      linewidth: 0.5,
       transparent: true,
       opacity: 1,
     });
@@ -52,6 +52,7 @@ export class EdgeManager extends WebGLManager {
       const curvePoints = curve.getPoints(100); // more points -> smoother
       const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
       const line = new THREE.Line(geometry, this.material);
+      line.position.z = -0.1;
 
       // Arrowhead
       const lastPoint = curvePoints[curvePoints.length - 1];
@@ -77,7 +78,7 @@ export class EdgeManager extends WebGLManager {
 
         arrow.position.copy(lastPoint);
         arrow.rotation.z = Math.atan2(direction.y, direction.x);
-        arrow.position.z = 0.1;
+        arrow.position.z = -0.05;
 
         this.edges.add(arrow);
         this.registerDisposable(arrowMaterial);

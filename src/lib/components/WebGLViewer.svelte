@@ -128,43 +128,36 @@
 
     if (!isDragging) return;
 
-    const { x, y } = screenToWorld(event.clientX, event.clientY);
-    const point = { x, y };
-
     switch (state.kind) {
       case 'initial':
         break;
 
       case 'panning': {
-        const rect = canvas.getBoundingClientRect();
         const currentScreenX = event.clientX - rect.left;
         const currentScreenY = event.clientY - rect.top;
 
-        // Convert screen movement to world movement
         const screenDeltaX = currentScreenX - state.last.x;
         const screenDeltaY = currentScreenY - state.last.y;
 
-        // Convert screen delta to world delta using the current scale
-        // Invert the deltas to move camera in same direction as mouse
-        // Note that SvgViewer vertical coords are in the opposite direction to WebGLViewer
         const worldDeltaX = -screenDeltaX / viewport.scale();
         const worldDeltaY = screenDeltaY / viewport.scale();
 
-        const camera = cameraManager.camera;
-        camera.position.x += worldDeltaX;
-        camera.position.y += worldDeltaY;
+        zoom.moveBy(worldDeltaX, worldDeltaY);
 
         state.last = { x: currentScreenX, y: currentScreenY };
-        camera.updateProjectionMatrix();
 
-        viewport.moveTo(camera.position.x, viewport.screenHeight() - camera.position.y - 20);
+        cameraManager.update();
+        viewport = viewport; // Trigger Svelte reactivity
         transform = viewport.worldToScreen();
         break;
       }
 
-      case 'brushing':
-        state.end = point;
+      case 'brushing': {
+        // Get end point for brushing in world coordinates
+        const { x: endX, y: endY } = screenToWorld(event.clientX, event.clientY);
+        state.end = { x: endX, y: endY };
         break;
+      }
     }
   }
 
@@ -202,8 +195,8 @@
     }
 
     // If not clicking a node, handle as panning or brushing
-    const screenX = event.clientX - rect.left;
-    const screenY = event.clientY - rect.top;
+    const screenXOnCanvas = event.clientX - rect.left;
+    const screenYOnCanvas = event.clientY - rect.top;
     isDragging = true;
 
     if (event.shiftKey && multiSelection) {
@@ -212,8 +205,8 @@
     } else {
       state = {
         kind: 'panning',
-        start: { x: screenX, y: screenY },
-        last: { x: screenX, y: screenY },
+        start: screenToWorld(event.clientX, event.clientY),
+        last: { x: screenXOnCanvas, y: screenYOnCanvas },
       };
     }
   }
@@ -269,32 +262,31 @@
     if (!cameraManager) return;
 
     event.preventDefault();
-    const camera = cameraManager.camera;
 
     // The following constants are taken from d3-zoom:
     // https://github.com/d3/d3-zoom/blob/95cd670cf2322b455eb6b04e95a5fb1fc963f269/src/zoom.js#L35
     const k = -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
-    const before = viewport.scale();
-    zoom.scaleBy(Math.pow(2, k));
-    if (before === viewport.scale()) {
-      return;
+    const scale = Math.pow(2, k);
+    const oldScale = viewport.scale();
+    zoom.scaleBy(scale);
+
+    if (oldScale === viewport.scale()) {
+      return; // Clamped
     }
 
-    // Get mouse position in normalized device coordinates
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    // Convert mouse position to world coordinates
-    const mouseWorld = new THREE.Vector3(mouseX, mouseY, 0).unproject(camera);
-    const center = viewport.center();
-
-    // Move the viewport to keep the mouse point fixed
-    zoom.moveBy(-(center.x - mouseWorld.x) * k, -(center.y - mouseWorld.y) * k);
-
-    // Update camera to match viewport
     cameraManager.update();
-    viewport.moveTo(camera.position.x, viewport.screenHeight() - camera.position.y - 20);
+
+    const mouse_world_under_cursor_after_scale = screenToWorld(event.clientX, event.clientY);
+    const center_before_translate = viewport.center();
+
+    zoom.moveBy(
+      -(center_before_translate.x - mouse_world_under_cursor_after_scale.x) * k,
+      -(center_before_translate.y - mouse_world_under_cursor_after_scale.y) * k,
+    );
+
+    cameraManager.update();
+
+    viewport = viewport; // Trigger Svelte reactivity
     transform = viewport.worldToScreen();
   }
 
@@ -369,13 +361,14 @@
 
     if (transition !== undefined && transition) {
       const progress = tweened(
-        { ...viewport.center(), k: viewport.scale() },
+        { x: viewport.center().x, y: viewport.center().y, k: viewport.scale() },
         { duration: 1000, easing: cubicInOut },
       );
       progress.subscribe((c: { x: number; y: number; k: number }) => {
         zoom.moveTo(c.x, c.y);
         zoom.scaleTo(c.k);
         cameraManager?.update();
+        viewport = viewport; // Ensure reactivity
         transform = viewport.worldToScreen();
       });
       await progress.set({ x, y, k });
@@ -383,6 +376,7 @@
       zoom.moveTo(x, y);
       zoom.scaleTo(k);
       cameraManager.update();
+      viewport = viewport; // Ensure reactivity
       transform = viewport.worldToScreen();
     }
   }
