@@ -104,15 +104,14 @@
   "dependencies": {
     "@dagrejs/dagre": "^1.1.2",
     "d3": "^7.9.0",
-    "elkjs": "^0.10.0",
     "protobufjs": "^7.3.2",
-    "three": "^0.176.0",
-    "troika-three-text": "^0.52.4",
     "ts-graphviz": "^2.1.2"
   },
   "optionalDependencies": {
     "canvas": "^2.11.2",
-    "jsdom": "^24.1.0"
+    "jsdom": "^24.1.0",
+    "three": "^0.176.0",
+    "troika-three-text": "^0.52.4"
   },
   "packageManager": "pnpm@9.9.0"
 }
