@@ -63,7 +63,7 @@
         Math.min(
           viewport.screenWidth() / drawable.boundingBox.width,
           viewport.screenHeight() / drawable.boundingBox.height,
-        ) * 0.667,
+        ) * 0.5,
       max: 1,
     })
     .setTranslationExtent(

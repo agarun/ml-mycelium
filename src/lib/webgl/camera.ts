@@ -8,7 +8,8 @@ export class CameraManager {
   constructor(viewport: Viewport) {
     this.viewport = viewport;
     const aspect = viewport.screenWidth() / viewport.screenHeight();
-    const frustumSize = viewport.world().height;
+    const scale = viewport.scale();
+    const frustumSize = viewport.world().height / scale;
 
     this.camera = new THREE.OrthographicCamera(
       (frustumSize * aspect) / -2,
@@ -24,7 +25,7 @@ export class CameraManager {
 
   update(): void {
     const { x, y } = this.viewport.center();
-    const scale = this.viewport.scale();
+    const scale = 1;
     const aspect = this.viewport.screenWidth() / this.viewport.screenHeight();
     const frustumSize = this.viewport.world().height / scale;
 

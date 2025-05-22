@@ -8,8 +8,8 @@
   type Props = {
     setFocus: (boundingBox: Readonly<BoundingBox>, transition?: boolean) => Promise<void>;
   };
-  declare type SvgViewerStrict = SvgViewer & Props
-  declare type WebGLViewerStrict = WebGLViewer & Props
+  declare type SvgViewerStrict = SvgViewer & Props;
+  declare type WebGLViewerStrict = WebGLViewer & Props;
 </script>
 
 <script lang="ts">
@@ -280,7 +280,7 @@
 
   function handleMinimapNavigation(e: CustomEvent<IEventMinimapNavigation>) {
     const { x, y } = e.detail.center;
-    viewport.moveTo(x, y);
+    viewport.moveTo(x, renderer === 'svg' ? y : -y);
     viewport = viewport;
   }
 
@@ -348,6 +348,7 @@
         height={height * minimapSizeFactor}
         worldExtent={viewport.world()}
         {drawable}
+        {renderer}
       />
     </div>
   {/if}
