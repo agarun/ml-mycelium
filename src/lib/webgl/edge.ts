@@ -16,7 +16,7 @@ export class EdgeManager extends WebGLManager {
       color: Theme.colors.foreground.grayTertiary,
       linewidth: 0.5,
       transparent: true,
-      opacity: 1,
+      opacity: 0.5,
     });
     this.edges = new THREE.Group();
     this.sceneManager = sceneManager;
@@ -27,7 +27,7 @@ export class EdgeManager extends WebGLManager {
     for (const edge of drawable.edges.children) {
       const transformedEdgePoints = edge.points.map((p) => ({
         x: p.x,
-        y: this.sceneManager.transformY(p.y),
+        y: p.y,
       }));
       const curveBuilder = new CurveBuilder(transformedEdgePoints);
       const path = curveBuilder.build();
@@ -73,12 +73,17 @@ export class EdgeManager extends WebGLManager {
         // Create inward-curved edge back to the tip
         arrowShape.quadraticCurveTo(-arrowLength * 0.8, -arrowWidth * 0.8, 0, 0);
 
-        const arrowMaterial = this.material.clone();
+        const arrowMaterial = new THREE.MeshBasicMaterial({
+          color: Theme.colors.foreground.grayTertiary,
+          transparent: true,
+          opacity: 1,
+          side: THREE.DoubleSide,
+        });
         const arrow = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape), arrowMaterial);
 
         arrow.position.copy(lastPoint);
         arrow.rotation.z = Math.atan2(direction.y, direction.x);
-        arrow.position.z = -0.05;
+        arrow.position.z = -0.15;
 
         this.edges.add(arrow);
         this.registerDisposable(arrowMaterial);

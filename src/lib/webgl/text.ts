@@ -28,6 +28,8 @@ const Text = {
     }
     textMesh.anchorX = 'center';
     textMesh.anchorY = 'middle';
+    textMesh.rotation.z = Math.PI;
+    textMesh.rotation.y = Math.PI;
     textMesh.sync();
     return textMesh;
   },

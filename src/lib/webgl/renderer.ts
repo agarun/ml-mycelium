@@ -17,10 +17,16 @@ export class RendererManager {
   }
 
   updateSize(): void {
-    const width = this.viewport.screenWidth();
-    const height = this.viewport.screenHeight();
-    this.renderer.setSize(width, height, false);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    const canvas = this.renderer.domElement;
+    const dpr = window.devicePixelRatio;
+    const width = Math.floor(canvas.clientWidth * dpr);
+    const height = Math.floor(canvas.clientHeight * dpr);
+
+    if (canvas.width !== width || canvas.height !== height) {
+      this.renderer.setSize(width, height, false);
+    }
+
+    this.renderer.setPixelRatio(dpr);
   }
 
   render(scene: THREE.Scene, camera: THREE.Camera): void {

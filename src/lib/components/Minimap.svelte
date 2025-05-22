@@ -15,13 +15,8 @@
   const dispatch = createEventDispatcher<IEventDispatchMinimap>();
 
   function boundingBoxToRect(bb: BoundingBox) {
-    let min = viewport.worldToScreen().apply(bb.xMin, bb.yMin);
-    let max = viewport.worldToScreen().apply(bb.xMax, bb.yMax);
-
-    if (renderer === 'webgl') {
-      min = viewport.worldToScreen().apply(bb.xMin, -bb.yMax);
-      max = viewport.worldToScreen().apply(bb.xMax, -bb.yMin);
-    }
+    const min = viewport.worldToScreen().apply(bb.xMin, bb.yMin);
+    const max = viewport.worldToScreen().apply(bb.xMax, bb.yMax);
 
     return {
       x: min.x,
@@ -35,7 +30,6 @@
   export let width: number;
   export let height: number;
   export let worldExtent: BoundingBox;
-  export let renderer: Renderer = 'svg';
 
   $: viewport = new Viewport(width, height);
   $: viewport.fit(drawable.boundingBox.padded(2));

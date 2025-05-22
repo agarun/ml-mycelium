@@ -23,11 +23,13 @@ export default class ExpandedModuleManager extends WebGLManager {
       color: 'rgb(250,250,250)',
       transparent: true,
       opacity: 1,
+      side: THREE.DoubleSide,
     });
     this.borderMaterial = new THREE.MeshBasicMaterial({
       color: 'rgb(134, 134, 139)',
       transparent: true,
       opacity: 1,
+      side: THREE.DoubleSide,
     });
   }
 
@@ -72,12 +74,12 @@ export default class ExpandedModuleManager extends WebGLManager {
 
     const bgGeometry = WebGLRect.render(bb.width, bb.height, 6);
     const bgMesh = new THREE.Mesh(bgGeometry, this.material);
-    bgMesh.position.set(bb.center.x, this.sceneManager.transformY(bb.center.y), zIndex);
+    bgMesh.position.set(bb.center.x, bb.center.y, zIndex);
     group.add(bgMesh);
 
     const borderGeometry = WebGLRect.render(bb.width, bb.height, 6, 1);
     const border = new THREE.Mesh(borderGeometry, this.borderMaterial);
-    border.position.set(bb.center.x, this.sceneManager.transformY(bb.center.y), zIndex + 0.1);
+    border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
 
     const textMesh = WebGLText.render(name, {
@@ -87,7 +89,7 @@ export default class ExpandedModuleManager extends WebGLManager {
     });
     textMesh.anchorX = 'left';
     textMesh.anchorY = 'top';
-    textMesh.position.set(bb.xMin, this.sceneManager.transformY(bb.yMin) + 13.33, zIndex + 0.2);
+    textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
     this.registerDisposable(textMesh);
 
     group.add(textMesh);
@@ -102,8 +104,15 @@ export default class ExpandedModuleManager extends WebGLManager {
       for (const child of module.children) {
         if (child instanceof THREE.Mesh) {
           child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          } else if (Array.isArray(child.material)) {
+            child.material.forEach((material: THREE.Material) => material.dispose());
+          }
         } else if (child instanceof THREE.LineSegments) {
           child.geometry.dispose();
+        } else if (child instanceof Text) {
+          child.dispose();
         }
       }
     }

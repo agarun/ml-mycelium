@@ -9,14 +9,12 @@ import { NodeManager } from './node';
 
 export class SceneManager {
   public scene: THREE.Scene;
-  private boundingBox: BoundingBox;
   private nodeManager: NodeManager;
   private edgeManager: EdgeManager;
 
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xffffff);
-    this.boundingBox = BoundingBox.infinity();
     this.nodeManager = new NodeManager(this);
     this.edgeManager = new EdgeManager(this);
   }
@@ -61,20 +59,6 @@ export class SceneManager {
     if (allEdgePoints.length > 0) {
       allElementsBB = allElementsBB.union(BoundingBox.fromPoints(...allEdgePoints));
     }
-
-    this.boundingBox = allElementsBB.padded({
-      l: 20,
-      r: 20,
-      t: 20,
-      b: 0,
-    });
-  }
-
-  public transformY(originalY: number): number {
-    if (this.boundingBox.isEmpty() || this.boundingBox.height === 0) {
-      return originalY;
-    }
-    return this.boundingBox.yMax - (originalY - this.boundingBox.yMin);
   }
 
   public getNodeAtPoint(point: THREE.Vector2, camera: THREE.Camera): NodeId | undefined {

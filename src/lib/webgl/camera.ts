@@ -14,8 +14,9 @@ export class CameraManager {
     this.camera = new THREE.OrthographicCamera(
       (frustumSize * aspect) / -2,
       (frustumSize * aspect) / 2,
-      frustumSize / 2,
+      // Flip the camera to match the SVG coordinate system
       frustumSize / -2,
+      frustumSize / 2,
       1,
       1000,
     );
@@ -31,8 +32,8 @@ export class CameraManager {
 
     this.camera.left = (-frustumSize * aspect) / 2;
     this.camera.right = (frustumSize * aspect) / 2;
-    this.camera.top = frustumSize / 2;
-    this.camera.bottom = -frustumSize / 2;
+    this.camera.top = -frustumSize / 2;
+    this.camera.bottom = frustumSize / 2;
     this.camera.position.set(x, y, 5);
     this.camera.updateProjectionMatrix();
   }

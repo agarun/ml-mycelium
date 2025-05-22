@@ -280,7 +280,7 @@
 
   function handleMinimapNavigation(e: CustomEvent<IEventMinimapNavigation>) {
     const { x, y } = e.detail.center;
-    viewport.moveTo(x, renderer === 'svg' ? y : -y);
+    viewport.moveTo(x, y);
     viewport = viewport;
   }
 
@@ -348,7 +348,6 @@
         height={height * minimapSizeFactor}
         worldExtent={viewport.world()}
         {drawable}
-        {renderer}
       />
     </div>
   {/if}

@@ -42,6 +42,7 @@ export class BadgeManager extends WebGLManager {
         color: color,
         transparent: true,
         opacity: 1,
+        side: THREE.DoubleSide,
       });
       this.materials.set(color, material);
     }
@@ -56,6 +57,7 @@ export class BadgeManager extends WebGLManager {
       color: 'white',
       transparent: true,
       opacity: 1,
+      side: THREE.DoubleSide,
     });
     const border = new THREE.Mesh(borderGeometry, borderMaterial);
     group.add(border);
@@ -197,8 +199,6 @@ export class NodeManager extends WebGLManager {
       const originalBB = entity.boundingBox();
       const decoration = decorations.get(nodeId);
 
-      const transformedCenterY = this.sceneManager.transformY(originalBB.center.y);
-
       // Create node background
       let initialBgColor = entity.options.backgroundColor || Theme.colors.white;
       if (decoration?.backgroundColor) {
@@ -212,17 +212,18 @@ export class NodeManager extends WebGLManager {
           color: initialBgColor,
           transparent: true,
           opacity: 1,
+          side: THREE.DoubleSide,
         });
         this.materials.set(materialKey, material);
       }
       const bgGeometry = WebGLRect.render(originalBB.width, originalBB.height, 6);
       const bgMesh = new THREE.Mesh(bgGeometry, material);
-      bgMesh.position.set(originalBB.center.x, transformedCenterY, 0);
+      bgMesh.position.set(originalBB.center.x, originalBB.center.y, 0);
       bgMesh.userData.nodeId = nodeId;
 
       // Create node border
       let initialBorderColor = entity.options.borderColor || Theme.colors.foreground.grayTertiary;
-      let initialBorderWidth = 1; // Default border width
+      let initialBorderWidth = 1;
 
       if (decoration?.borderColor) {
         initialBorderColor = decoration.borderColor;
@@ -237,14 +238,14 @@ export class NodeManager extends WebGLManager {
         6,
         initialBorderWidth,
       );
-      // For borders, we don't cache materials as they change with hover/selection frequently
       const borderMaterial = new THREE.MeshBasicMaterial({
         color: initialBorderColor,
         transparent: true,
         opacity: 1,
+        side: THREE.DoubleSide,
       });
       const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
-      borderMesh.position.set(originalBB.center.x, transformedCenterY, 0.1);
+      borderMesh.position.set(originalBB.center.x, originalBB.center.y, 0.1);
       borderMesh.userData.nodeId = nodeId;
       borderMesh.userData.nodeOptions = entity.options;
       borderMesh.userData.decorationOptions = decoration;
@@ -252,28 +253,21 @@ export class NodeManager extends WebGLManager {
       borderMesh.userData.nodeHeight = originalBB.height;
       borderMesh.userData.currentBorderWidth = initialBorderWidth;
 
-      // Create and position the group for all node content
       const contentGroup = new THREE.Group();
-      // Position content group relative to node center, with proper Y transformation
       contentGroup.position.set(
-        originalBB.center.x - originalBB.width / 2, // Start from left edge
-        transformedCenterY + originalBB.height / 2, // Start from top edge
+        originalBB.center.x - originalBB.width / 2,
+        originalBB.center.y - originalBB.height / 2,
         0.2,
       );
       this.sceneManager.scene.add(contentGroup);
       this.contentGroups.set(nodeId, contentGroup);
 
       if (entity.content) {
-        // Pass 0 as the relative Z since we're already positioned correctly
         this.renderDisplayObject(entity.content, contentGroup, nodeId, 0);
       }
 
       if (entity.options.badge) {
-        const badgePosition = new THREE.Vector3(
-          originalBB.xMax + 1,
-          this.sceneManager.transformY(originalBB.yMin - 1),
-          0.2,
-        );
+        const badgePosition = new THREE.Vector3(originalBB.xMax + 1, originalBB.yMin - 1, 1.0);
         this.badgeManager.render(
           nodeId,
           entity.options.badge.color,
@@ -313,13 +307,13 @@ export class NodeManager extends WebGLManager {
       const text = WebGLText.render(displayObject.text, displayObject.options);
       text.position.set(
         displayObjectPosX + displayObjectBB.width / 2,
-        -displayObjectPosY - displayObjectBB.height / 2,
+        displayObjectPosY + displayObjectBB.height / 2,
         currentRelativeZ,
       );
       parent.add(text);
     } else if (displayObject instanceof Container) {
       const containerGroup = new THREE.Group();
-      containerGroup.position.set(displayObjectPosX, -displayObjectPosY, currentRelativeZ);
+      containerGroup.position.set(displayObjectPosX, displayObjectPosY, currentRelativeZ);
       parent.add(containerGroup);
 
       for (const child of displayObject.children) {
@@ -330,7 +324,10 @@ export class NodeManager extends WebGLManager {
 
   getNodeAtPoint(point: THREE.Vector2, camera: THREE.Camera): NodeId | undefined {
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(point, camera);
+
+    // We need to flip the y coordinate since the camera is flipped
+    const transformedPoint = new THREE.Vector2(point.x, -point.y);
+    raycaster.setFromCamera(transformedPoint, camera);
 
     // Get all interactive objects
     const objects = this.interactiveNodes;

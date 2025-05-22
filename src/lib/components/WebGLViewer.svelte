@@ -95,7 +95,7 @@
     if (!cameraManager) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const normalizedX = ((x - rect.left) / rect.width) * 2 - 1;
-    const normalizedY = -((y - rect.top) / rect.height) * 2 + 1;
+    const normalizedY = ((y - rect.top) / rect.height) * 2 - 1;
     const worldPoint = new THREE.Vector3(normalizedX, normalizedY, 0);
     worldPoint.unproject(cameraManager.camera);
     return { x: worldPoint.x, y: worldPoint.y };
@@ -106,7 +106,7 @@
 
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    mouse.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
 
     // Find if a node is currently being hovered
     const nodeId = sceneManager.getNodeAtPoint(mouse, cameraManager.camera);
@@ -140,20 +140,19 @@
         const screenDeltaY = currentScreenY - state.last.y;
 
         const worldDeltaX = -screenDeltaX / viewport.scale();
-        const worldDeltaY = screenDeltaY / viewport.scale();
+        const worldDeltaY = -screenDeltaY / viewport.scale();
 
         zoom.moveBy(worldDeltaX, worldDeltaY);
 
         state.last = { x: currentScreenX, y: currentScreenY };
 
         cameraManager.update();
-        viewport = viewport; // Trigger Svelte reactivity
+        viewport = viewport;
         transform = viewport.worldToScreen();
         break;
       }
 
       case 'brushing': {
-        // Get end point for brushing in world coordinates
         const { x: endX, y: endY } = screenToWorld(event.clientX, event.clientY);
         state.end = { x: endX, y: endY };
         break;
@@ -169,7 +168,7 @@
 
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    mouse.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
 
     if (cameraManager) {
       // Check if we're clicking on a node first
@@ -186,9 +185,10 @@
           } else {
             dispatch('expand', { nodeId });
           }
-        } else {
-          dispatch('nodeClick', { nodeId, original: event });
+          return;
         }
+
+        dispatch('nodeClick', { nodeId, original: event });
       }
     }
 
@@ -274,17 +274,12 @@
 
     cameraManager.update();
 
-    const mouse_world_under_cursor_after_scale = screenToWorld(event.clientX, event.clientY);
-    const center_before_translate = viewport.center();
+    const { x, y } = screenToWorld(event.clientX, event.clientY);
+    const centerBeforeTranslation = viewport.center();
 
-    zoom.moveBy(
-      -(center_before_translate.x - mouse_world_under_cursor_after_scale.x) * k,
-      -(center_before_translate.y - mouse_world_under_cursor_after_scale.y) * k,
-    );
-
+    zoom.moveBy(-(centerBeforeTranslation.x - x) * k, (centerBeforeTranslation.y - y) * k);
     cameraManager.update();
-
-    viewport = viewport; // Trigger Svelte reactivity
+    viewport = viewport;
     transform = viewport.worldToScreen();
   }
 
