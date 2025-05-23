@@ -10,20 +10,13 @@
   import { Viewport } from '$lib/viewport';
   import { createEventDispatcher, onMount } from 'svelte';
   import * as d3 from 'd3';
-  import type { Renderer } from '$lib/viewer';
 
   const dispatch = createEventDispatcher<IEventDispatchMinimap>();
 
   function boundingBoxToRect(bb: BoundingBox) {
     const min = viewport.worldToScreen().apply(bb.xMin, bb.yMin);
     const max = viewport.worldToScreen().apply(bb.xMax, bb.yMax);
-
-    return {
-      x: min.x,
-      y: min.y,
-      w: max.x - min.x,
-      h: max.y - min.y,
-    };
+    return { x: min.x, y: min.y, w: max.x - min.x, h: max.y - min.y };
   }
 
   export let drawable: IDrawableNetwork;

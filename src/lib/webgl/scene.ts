@@ -14,7 +14,7 @@ export class SceneManager {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xffffff);
+    this.scene.background = null;
     this.nodeManager = new NodeManager(this);
     this.edgeManager = new EdgeManager(this);
   }
