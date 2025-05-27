@@ -56,7 +56,9 @@ export class EdgeManager extends WebGLManager {
 
       // Smooth the curve
       const curve = new THREE.CatmullRomCurve3(points);
-      const curvePoints = curve.getPoints(100); // more points -> smoother
+      const curveLength = curve.getLength();
+      const pointCount = Math.max(10, Math.min(50, Math.floor(curveLength / 10)));
+      const curvePoints = curve.getPoints(pointCount);
       const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
       const line = new THREE.Line(geometry, this.material);
       line.position.z = -0.1;
