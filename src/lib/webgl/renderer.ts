@@ -12,6 +12,7 @@ export class RendererManager {
       antialias: true,
       alpha: true,
       preserveDrawingBuffer: true,
+      powerPreference: 'high-performance',
     });
     this.updateSize();
   }
