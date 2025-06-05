@@ -30,10 +30,12 @@
   }
 
   function handleMouseEnter(e: MouseEvent) {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     dispatch('nodeEnter', { ...e, nodeId });
   }
 
   function handleMouseLeave(e: MouseEvent) {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     dispatch('nodeLeave', { ...e, nodeId });
   }
 

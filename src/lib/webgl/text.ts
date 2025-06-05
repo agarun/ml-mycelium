@@ -31,7 +31,7 @@ export class TextManager extends WebGLManager {
   private key(text: string, options: ITextOptions, baseColor?: string): string {
     const color = options.foregroundColor || baseColor || Theme.colors.foreground.gray;
     const font = options.font || 'Roboto';
-    const fontWeight = options.fontWeight || 500;
+    const fontWeight = options.fontWeight;
     return `${text}|${options.fontSize}|${color}|${font}|${fontWeight}`;
   }
 
@@ -47,7 +47,7 @@ export class TextManager extends WebGLManager {
 
       if (options.font && options.font in FONTS) {
         const font = options.font as keyof typeof FONTS;
-        textMesh.font = FONTS[font][options.fontWeight || 500];
+        textMesh.font = FONTS[font][options.fontWeight];
       }
 
       textMesh.anchorX = 'center';

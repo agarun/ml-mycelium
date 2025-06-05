@@ -53,12 +53,20 @@ export class EdgeManager extends WebGLManager {
     while (this.edges.children.length > 0) {
       const child = this.edges.children[0];
       this.edges.remove(child);
-      if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach((material) => material.dispose());
+
+      if ('geometry' in child && child.geometry) {
+        const geometry = child.geometry as THREE.BufferGeometry;
+        geometry.dispose();
+      }
+
+      if ('material' in child && child.material) {
+        const material = child.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(material)) {
+          material.forEach((mat: THREE.Material) => {
+            mat.dispose();
+          });
         } else {
-          child.material.dispose();
+          material.dispose();
         }
       }
     }
@@ -101,39 +109,35 @@ export class EdgeManager extends WebGLManager {
       const pointCount = Math.max(10, Math.min(50, Math.floor(curveLength / 10)));
       const curvePoints = curve.getPoints(pointCount);
       const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+      this.registerDisposable(geometry);
+
       const line = new THREE.Line(geometry, this.material);
       line.position.z = -0.1;
+      this.edges.add(line);
 
       // Arrowhead
       const lastPoint = curvePoints[curvePoints.length - 1];
       const secondLastPoint = curvePoints[curvePoints.length - 2];
-      if (lastPoint && secondLastPoint) {
-        const direction = new THREE.Vector3().subVectors(lastPoint, secondLastPoint).normalize();
-        const arrowLength = 8;
-        const arrowWidth = 5;
+      const direction = new THREE.Vector3().subVectors(lastPoint, secondLastPoint).normalize();
+      const arrowLength = 8;
+      const arrowWidth = 5;
 
-        const arrowShape = new THREE.Shape();
+      const arrowShape = new THREE.Shape();
 
-        arrowShape.moveTo(0, 0);
+      arrowShape.moveTo(0, 0);
 
-        // Create inward-curved edge to the left point
-        arrowShape.quadraticCurveTo(-arrowLength * 0.8, arrowWidth * 0.8, -arrowLength, arrowWidth);
-        // Create slightly curved edge to the bottom point
-        arrowShape.quadraticCurveTo(-arrowLength * 0.6, 0, -arrowLength, -arrowWidth);
-        // Create inward-curved edge back to the tip
-        arrowShape.quadraticCurveTo(-arrowLength * 0.8, -arrowWidth * 0.8, 0, 0);
+      // Create inward-curved edge to the left point
+      arrowShape.quadraticCurveTo(-arrowLength * 0.8, arrowWidth * 0.8, -arrowLength, arrowWidth);
+      // Create slightly curved edge to the bottom point
+      arrowShape.quadraticCurveTo(-arrowLength * 0.6, 0, -arrowLength, -arrowWidth);
+      // Create inward-curved edge back to the tip
+      arrowShape.quadraticCurveTo(-arrowLength * 0.8, -arrowWidth * 0.8, 0, 0);
 
-        const arrow = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape), this.arrowMaterial);
-
-        arrow.position.copy(lastPoint);
-        arrow.rotation.z = Math.atan2(direction.y, direction.x);
-        arrow.position.z = -0.15;
-
-        this.edges.add(arrow);
-      }
-
-      this.registerDisposable(geometry);
-      this.edges.add(line);
+      const arrow = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape), this.arrowMaterial);
+      arrow.position.copy(lastPoint);
+      arrow.rotation.z = Math.atan2(direction.y, direction.x);
+      arrow.position.z = -0.15;
+      this.edges.add(arrow);
     }
   }
 

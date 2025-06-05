@@ -55,7 +55,7 @@
   export let minimap: boolean;
   export let autoResize: boolean;
   export let multiSelection: boolean;
-  export let renderer: Renderer = 'svg';
+  export let renderer: Renderer;
   autoResize; // Fix unused variable warning.
 
   export let decorations: Map<NodeId, Partial<IRectOptions>> = new Map();

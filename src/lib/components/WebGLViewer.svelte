@@ -51,6 +51,7 @@
 
   const { selections } = getContext<IViewerContext>(viewerKey);
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   $: if (sceneManager) {
     sceneManager.selectNodes(new Set($selections.keys()));
     requestRender();
@@ -316,9 +317,15 @@
   function setupNonPassiveEvents(element: HTMLElement) {
     const options: AddEventListenerOptions = { passive: false };
 
-    const wheelHandler = (e: WheelEvent) => handleWheel(e);
-    const touchHandler = (e: TouchEvent) => e.preventDefault();
-    const dragStartHandler = (e: DragEvent) => e.preventDefault();
+    const wheelHandler = (e: WheelEvent) => {
+      handleWheel(e);
+    };
+    const touchHandler = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+    const dragStartHandler = (e: DragEvent) => {
+      e.preventDefault();
+    };
 
     element.addEventListener('wheel', wheelHandler as EventListener, options);
     element.addEventListener('touchstart', touchHandler as EventListener, options);
@@ -344,17 +351,19 @@
 
     return () => {
       cancelRender();
-      if (sceneManager) sceneManager.dispose();
-      if (rendererManager) rendererManager.dispose();
-      if (cameraManager) cameraManager = undefined;
+      sceneManager.dispose();
+      rendererManager.dispose();
+      cameraManager = undefined;
     };
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   $: if (drawable && sceneManager) {
     sceneManager.updateNetwork(drawable, decorations);
     requestRender();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   $: if (viewport && cameraManager) {
     cameraManager.update();
     requestRender();

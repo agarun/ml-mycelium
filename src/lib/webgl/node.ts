@@ -7,14 +7,24 @@ import type { NodeId } from '$lib/network';
 import type { IDrawableNetwork } from '$lib/layout';
 import type { IRectOptions } from '$lib/ui';
 import type { INodeOptions } from '$lib/ui/node';
+import type { ITextOptions } from '$lib/ui/text';
 import { Theme } from '$lib/ui';
 import { DisplayObject, Container } from '$lib/scene';
 import { TextDisplayObject } from '$lib/ui/text';
+import { Transform } from '$lib/geometry';
 import { TextManager } from './text';
 import { WebGLManager } from './webgl';
 import { SceneManager } from './scene';
 import { ExpandedModuleManager } from './expanded-module';
 import WebGLRect from './rect';
+
+interface DisplayObjectHashResult {
+  type: 'text' | 'container' | 'unknown';
+  text?: string;
+  transform: Transform;
+  options?: ITextOptions;
+  children?: DisplayObjectHashResult[];
+}
 
 export class BadgeManager extends WebGLManager {
   private sceneManager: SceneManager;
@@ -94,10 +104,19 @@ export class BadgeManager extends WebGLManager {
     for (const badge of this.badges.values()) {
       this.sceneManager.scene.remove(badge);
       badge.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (object.material instanceof THREE.Material) {
-            object.material.dispose();
+        if ('geometry' in object && object.geometry) {
+          const geometry = object.geometry as THREE.BufferGeometry;
+          geometry.dispose();
+        }
+
+        if ('material' in object && object.material) {
+          const material = object.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(material)) {
+            material.forEach((mat: THREE.Material) => {
+              mat.dispose();
+            });
+          } else {
+            material.dispose();
           }
         }
       });
@@ -152,13 +171,13 @@ export class NodeManager extends WebGLManager {
         id,
         bb: node.boundingBox(),
         options: node.options,
-        content: node.content ? this.displayObjectHash(node.content) : null,
+        content: this.displayObjectHash(node.content),
       })),
       collapsed: Array.from(drawable.collapsed.entries()).map(([id, node]) => ({
         id,
         bb: node.boundingBox(),
         options: node.options,
-        content: node.content ? this.displayObjectHash(node.content) : null,
+        content: this.displayObjectHash(node.content),
       })),
       expanded: Array.from(drawable.expanded.entries()).map(([id, module]) => ({
         id,
@@ -168,7 +187,7 @@ export class NodeManager extends WebGLManager {
     });
   }
 
-  private displayObjectHash(obj: DisplayObject): any {
+  private displayObjectHash(obj: DisplayObject): DisplayObjectHashResult {
     if (obj instanceof TextDisplayObject) {
       return {
         type: 'text',
@@ -180,7 +199,7 @@ export class NodeManager extends WebGLManager {
       return {
         type: 'container',
         transform: obj.transform,
-        children: obj.children.map((child) => this.displayObjectHash(child)),
+        children: obj.children.map((child: DisplayObject) => this.displayObjectHash(child)),
       };
     }
     return { type: 'unknown', transform: obj.transform };
@@ -211,7 +230,9 @@ export class NodeManager extends WebGLManager {
       this.sceneManager.scene.remove(mesh);
       mesh.geometry.dispose();
       if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((material: THREE.Material) => material.dispose());
+        mesh.material.forEach((material: THREE.Material) => {
+          material.dispose();
+        });
       } else {
         mesh.material.dispose();
       }
@@ -222,7 +243,9 @@ export class NodeManager extends WebGLManager {
       this.sceneManager.scene.remove(border);
       border.geometry.dispose();
       if (Array.isArray(border.material)) {
-        border.material.forEach((material: THREE.Material) => material.dispose());
+        border.material.forEach((material: THREE.Material) => {
+          material.dispose();
+        });
       } else {
         border.material.dispose();
       }
@@ -234,12 +257,21 @@ export class NodeManager extends WebGLManager {
       group.traverse((object) => {
         if (object instanceof Text) {
           object.dispose();
-        } else if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (object.material instanceof THREE.Material) {
-            object.material.dispose();
-          } else if (Array.isArray(object.material)) {
-            object.material.forEach((material: THREE.Material) => material.dispose());
+        } else {
+          if ('geometry' in object && object.geometry) {
+            const geometry = object.geometry as THREE.BufferGeometry;
+            geometry.dispose();
+          }
+
+          if ('material' in object && object.material) {
+            const material = object.material as THREE.Material | THREE.Material[];
+            if (Array.isArray(material)) {
+              material.forEach((mat: THREE.Material) => {
+                mat.dispose();
+              });
+            } else {
+              material.dispose();
+            }
           }
         }
       });
@@ -280,7 +312,8 @@ export class NodeManager extends WebGLManager {
 
     const computeNestingLevel = (nodeId: NodeId): number => {
       if (moduleNestingLevels.has(nodeId)) {
-        return moduleNestingLevels.get(nodeId)!;
+        const level = moduleNestingLevels.get(nodeId);
+        return level !== undefined ? level : 0;
       }
       const parentId = moduleParents.get(nodeId);
       if (!parentId) {
@@ -381,9 +414,7 @@ export class NodeManager extends WebGLManager {
       this.sceneManager.scene.add(contentGroup);
       this.contentGroups.set(nodeId, contentGroup);
 
-      if (entity.content) {
-        this.renderDisplayObject(entity.content, contentGroup, nodeId, 0);
-      }
+      this.renderDisplayObject(entity.content, contentGroup, nodeId, 0);
 
       if (entity.options.badge) {
         const badgePosition = new THREE.Vector3(originalBB.xMax + 1, originalBB.yMin - 1, 1.0);
@@ -436,7 +467,7 @@ export class NodeManager extends WebGLManager {
       containerGroup.position.set(displayObjectPosX, displayObjectPosY, currentRelativeZ);
       parent.add(containerGroup);
 
-      for (const child of displayObject.children) {
+      for (const child of displayObject.children as DisplayObject[]) {
         this.renderDisplayObject(child, containerGroup, nodeId, currentRelativeZ + 0.001);
       }
     }
@@ -476,7 +507,7 @@ export class NodeManager extends WebGLManager {
       let current: THREE.Object3D | null = object;
       while (current) {
         if (current.userData.nodeId) {
-          return current.userData.nodeId;
+          return current.userData.nodeId as NodeId;
         }
         current = current.parent;
       }

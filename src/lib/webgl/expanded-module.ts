@@ -108,16 +108,23 @@ export class ExpandedModuleManager extends WebGLManager {
     for (const module of this.expandedModules.values()) {
       this.sceneManager.scene.remove(module);
       for (const child of module.children) {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          } else if (Array.isArray(child.material)) {
-            child.material.forEach((material: THREE.Material) => material.dispose());
+        if ('geometry' in child && child.geometry) {
+          const geometry = child.geometry as THREE.BufferGeometry;
+          geometry.dispose();
+        }
+
+        if ('material' in child && child.material) {
+          const material = child.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(material)) {
+            material.forEach((mat: THREE.Material) => {
+              mat.dispose();
+            });
+          } else {
+            material.dispose();
           }
-        } else if (child instanceof THREE.LineSegments) {
-          child.geometry.dispose();
-        } else if (child instanceof Text) {
+        }
+
+        if (child instanceof Text) {
           child.dispose();
         }
       }

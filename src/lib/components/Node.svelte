@@ -30,11 +30,13 @@
 
   function handleMouseEnter(e: MouseEvent) {
     isHover = true;
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     dispatch('nodeEnter', { ...e, nodeId });
   }
 
   function handleMouseLeave(e: MouseEvent) {
     isHover = false;
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     dispatch('nodeLeave', { ...e, nodeId });
   }
 

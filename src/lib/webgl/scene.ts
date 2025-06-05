@@ -79,29 +79,27 @@ export class SceneManager {
     this.nodeManager.dispose();
     this.edgeManager.dispose();
 
+    this.scene.traverse((object: THREE.Object3D) => {
+      if ('geometry' in object && object.geometry) {
+        const geometry = object.geometry as THREE.BufferGeometry;
+        geometry.dispose();
+      }
+
+      if ('material' in object && object.material) {
+        const material = object.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(material)) {
+          material.forEach((mat: THREE.Material) => {
+            mat.dispose();
+          });
+        } else {
+          material.dispose();
+        }
+      }
+    });
+
     while (this.scene.children.length > 0) {
       const child = this.scene.children[0];
       this.scene.remove(child);
     }
-
-    this.traverse(this.scene, (object) => {
-      if (object.geometry) {
-        object.geometry.dispose();
-      }
-      if (object.material) {
-        if (Array.isArray(object.material)) {
-          object.material.forEach((material: THREE.Material) => material.dispose());
-        } else {
-          object.material.dispose();
-        }
-      }
-    });
-  }
-
-  traverse(node: THREE.Object3D, callback: (object: any) => void): void {
-    callback(node);
-    node.children.forEach((child) => {
-      this.traverse(child, callback);
-    });
   }
 }
