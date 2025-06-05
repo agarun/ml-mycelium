@@ -72,7 +72,7 @@ export class NetworkViewer {
       minimap: true,
       layoutProvider: new DagreLayoutProvider(),
       multiSelection: true,
-      renderer: 'webgl',
+      renderer: 'svg',
       ...options,
     };
 

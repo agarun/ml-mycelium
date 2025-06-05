@@ -1,3 +1,6 @@
+// For licensing see accompanying LICENSE file.
+// Copyright (C) 2025 Apple Inc. All Rights Reserved.
+
 import { Text as TroikaText } from 'troika-three-text';
 import { Theme } from '$lib/ui';
 import { type ITextOptions } from '$lib/ui/text';

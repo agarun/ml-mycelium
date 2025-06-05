@@ -1,3 +1,6 @@
+// For licensing see accompanying LICENSE file.
+// Copyright (C) 2025 Apple Inc. All Rights Reserved.
+
 import * as THREE from 'three';
 import type { NodeId } from '$lib/network';
 import type { IDrawableNetwork } from '$lib/layout';
@@ -76,13 +79,11 @@ export class SceneManager {
     this.nodeManager.dispose();
     this.edgeManager.dispose();
 
-    // Clear all objects from the scene
     while (this.scene.children.length > 0) {
       const child = this.scene.children[0];
       this.scene.remove(child);
     }
 
-    // Traverse any remaining objects and dispose them
     this.traverse(this.scene, (object) => {
       if (object.geometry) {
         object.geometry.dispose();

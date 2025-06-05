@@ -1,3 +1,6 @@
+// For licensing see accompanying LICENSE file.
+// Copyright (C) 2025 Apple Inc. All Rights Reserved.
+
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import type { NodeId } from '$lib/network';
@@ -562,7 +565,7 @@ export class NodeManager extends WebGLManager {
 
     const { isHovered = false, isSelected = false } = options;
 
-    let finalBorderColor: string = baseBorderColor; // Explicitly typed as string
+    let finalBorderColor: string = baseBorderColor;
     let finalBorderWidth = baseBorderWidth;
 
     if (isSelected) {
@@ -573,25 +576,20 @@ export class NodeManager extends WebGLManager {
       // finalBorderWidth remains baseBorderWidth for hover
     }
 
-    // Update material color
     if (borderMesh.material instanceof THREE.MeshBasicMaterial) {
       borderMesh.material.color.set(finalBorderColor);
     } else {
-      // Fallback or create new material if type is wrong, though it should be MeshBasicMaterial
       const newMaterial = new THREE.MeshBasicMaterial({
         color: finalBorderColor,
         transparent: true,
         opacity: 1,
       });
-      if (borderMesh.material instanceof THREE.Material) {
-        borderMesh.material.dispose();
-      }
+      borderMesh.material instanceof THREE.Material && borderMesh.material.dispose();
       borderMesh.material = newMaterial;
     }
 
-    // Update geometry if borderWidth has changed
-    const oldGeomBorderWidth = borderMesh.userData.currentBorderWidth as number;
-    if (finalBorderWidth !== oldGeomBorderWidth) {
+    const oldBorderWidth = borderMesh.userData.currentBorderWidth as number;
+    if (finalBorderWidth !== oldBorderWidth) {
       borderMesh.geometry.dispose();
       borderMesh.geometry = WebGLRect.render(nodeWidth, nodeHeight, 6, finalBorderWidth);
       borderMesh.userData.currentBorderWidth = finalBorderWidth;

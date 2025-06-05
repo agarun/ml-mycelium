@@ -1,3 +1,6 @@
+// For licensing see accompanying LICENSE file.
+// Copyright (C) 2025 Apple Inc. All Rights Reserved.
+
 import * as THREE from 'three';
 import type { Viewport } from '$lib/viewport';
 

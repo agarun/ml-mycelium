@@ -14,7 +14,7 @@
  *     new ui.Text(nodeId),
  *   ),
  * ).with({
- *   backgroundColor: ui.Theme.GRAY_BACKGROUND,
+ *   backgroundColor: ui.Theme.colors.background.gray,
  *   tooltip: () => new ui.Text('This is a new'),
  * });
  */
