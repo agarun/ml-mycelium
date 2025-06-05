@@ -30,7 +30,8 @@
   let cameraManager: CameraManager | undefined;
   let rendererManager: RendererManager;
   let sceneManager: SceneManager;
-  let animationFrameId: number;
+  let animationFrameId: number | null = null;
+  let shouldRender = false;
 
   type InitialState = { kind: 'initial' };
   type PanningState = { kind: 'panning'; start: IPoint; last: IPoint };
@@ -52,6 +53,7 @@
 
   $: if (sceneManager) {
     sceneManager.selectNodes(new Set($selections.keys()));
+    requestRender();
   }
 
   $: viewportWorld = viewport.world();
@@ -124,6 +126,7 @@
       }
 
       hoveredNodeId = nodeId;
+      requestRender();
     }
 
     if (!isDragging) return;
@@ -149,12 +152,14 @@
         cameraManager.update();
         viewport = viewport;
         transform = viewport.worldToScreen();
+        requestRender();
         break;
       }
 
       case 'brushing': {
         const { x: endX, y: endY } = screenToWorld(event.clientX, event.clientY);
         state.end = { x: endX, y: endY };
+        requestRender();
         break;
       }
     }
@@ -250,6 +255,7 @@
       dispatch('nodeLeave', { nodeId: hoveredNodeId });
       sceneManager.hoverNode(undefined);
       hoveredNodeId = undefined;
+      requestRender();
     }
 
     isDragging = false;
@@ -281,12 +287,30 @@
     cameraManager.update();
     viewport = viewport;
     transform = viewport.worldToScreen();
+    requestRender();
   }
 
-  function animate() {
+  function render(): void {
     if (!cameraManager) return;
-    animationFrameId = requestAnimationFrame(animate);
+    shouldRender = false;
+    animationFrameId = null;
     rendererManager.render(sceneManager.scene, cameraManager.camera);
+  }
+
+  // render on-demand insteaed of continuously
+  function requestRender(): void {
+    if (!cameraManager) return;
+    if (shouldRender) return;
+    shouldRender = true;
+    animationFrameId = requestAnimationFrame(render);
+  }
+
+  function cancelRender(): void {
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+      shouldRender = false;
+    }
   }
 
   function setupNonPassiveEvents(element: HTMLElement) {
@@ -316,24 +340,24 @@
     rendererManager = new RendererManager(canvas, viewport);
     sceneManager = new SceneManager();
 
-    animate();
+    requestRender();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (cameraManager) {
-        cameraManager = undefined;
-      }
-      rendererManager.dispose();
-      sceneManager.dispose();
+      cancelRender();
+      if (sceneManager) sceneManager.dispose();
+      if (rendererManager) rendererManager.dispose();
+      if (cameraManager) cameraManager = undefined;
     };
   });
 
   $: if (drawable && sceneManager) {
     sceneManager.updateNetwork(drawable, decorations);
+    requestRender();
   }
 
   $: if (viewport && cameraManager) {
     cameraManager.update();
+    requestRender();
   }
 
   export async function setFocus(boundingBox: Readonly<BoundingBox>, transition?: boolean) {
@@ -363,6 +387,7 @@
         cameraManager?.update();
         viewport = viewport; // Ensure reactivity
         transform = viewport.worldToScreen();
+        requestRender();
       });
       await progress.set({ x, y, k });
     } else {
@@ -371,6 +396,7 @@
       cameraManager.update();
       viewport = viewport; // Ensure reactivity
       transform = viewport.worldToScreen();
+      requestRender();
     }
   }
 </script>

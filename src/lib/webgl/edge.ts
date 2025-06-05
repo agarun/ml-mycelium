@@ -10,6 +10,7 @@ export class EdgeManager extends WebGLManager {
   private arrowMaterial: THREE.MeshBasicMaterial;
   private edges: THREE.Group;
   private sceneManager: SceneManager;
+  private lastDrawableHash: string | null = null;
 
   constructor(sceneManager: SceneManager) {
     super();
@@ -28,6 +29,43 @@ export class EdgeManager extends WebGLManager {
     this.edges = new THREE.Group();
     this.sceneManager = sceneManager;
     this.sceneManager.scene.add(this.edges);
+  }
+
+  private drawableHash(drawable: IDrawableNetwork): string {
+    return JSON.stringify(
+      drawable.edges.children.map((edge) => ({
+        points: edge.points.map((p) => ({ x: p.x, y: p.y })),
+      })),
+    );
+  }
+
+  private needsUpdate(drawable: IDrawableNetwork): boolean {
+    const drawableHash = this.drawableHash(drawable);
+    const didDrawableUpdate = this.lastDrawableHash !== this.drawableHash(drawable);
+    if (didDrawableUpdate) this.lastDrawableHash = drawableHash;
+    return didDrawableUpdate;
+  }
+
+  private clearEdges(): void {
+    while (this.edges.children.length > 0) {
+      const child = this.edges.children[0];
+      this.edges.remove(child);
+      if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((material) => material.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+  }
+
+  renderEdges(drawable: IDrawableNetwork): void {
+    if (this.needsUpdate(drawable)) {
+      this.clearEdges();
+      this.render(drawable);
+    }
   }
 
   render(drawable: IDrawableNetwork) {
@@ -99,16 +137,7 @@ export class EdgeManager extends WebGLManager {
   dispose(): void {
     this.material.dispose();
     this.arrowMaterial.dispose();
-    while (this.edges.children.length > 0) {
-      const line = this.edges.children[0] as THREE.Line;
-      this.edges.remove(line);
-      line.geometry.dispose();
-      if (Array.isArray(line.material)) {
-        line.material.forEach((material) => material.dispose());
-      } else {
-        line.material.dispose();
-      }
-    }
+    this.clearEdges();
     super.dispose();
   }
 }

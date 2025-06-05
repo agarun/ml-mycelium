@@ -3,21 +3,23 @@ import { Theme } from '$lib/ui';
 import { BoundingBox } from '$lib/geometry';
 import type { NodeId } from '$lib/network';
 import WebGLRect from './rect';
-import WebGLText from './text';
 import { Text } from 'troika-three-text';
+import { TextManager } from './text';
 import { SceneManager } from './scene';
 import { WebGLManager } from './webgl';
 
-export default class ExpandedModuleManager extends WebGLManager {
+export class ExpandedModuleManager extends WebGLManager {
   private sceneManager: SceneManager;
+  private textManager: TextManager;
   public expandedModules: Map<NodeId, THREE.Group>;
   private material: THREE.MeshBasicMaterial;
   private borderMaterial: THREE.MeshBasicMaterial;
   private hoveredNodeId: NodeId | undefined;
 
-  constructor(sceneManager: SceneManager) {
+  constructor(sceneManager: SceneManager, textManager: TextManager) {
     super();
     this.sceneManager = sceneManager;
+    this.textManager = textManager;
     this.expandedModules = new Map();
     this.material = new THREE.MeshBasicMaterial({
       color: 'rgb(250,250,250)',
@@ -82,7 +84,7 @@ export default class ExpandedModuleManager extends WebGLManager {
     border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
 
-    const textMesh = WebGLText.render(name, {
+    const textMesh = this.textManager.render(name, {
       fontSize: 16,
       font: Theme.font.family,
       fontWeight: Theme.font.weight.regular,
@@ -90,6 +92,7 @@ export default class ExpandedModuleManager extends WebGLManager {
     textMesh.anchorX = 'left';
     textMesh.anchorY = 'top';
     textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
+    textMesh.sync();
     this.registerDisposable(textMesh);
 
     group.add(textMesh);

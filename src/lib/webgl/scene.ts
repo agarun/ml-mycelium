@@ -21,7 +21,6 @@ export class SceneManager {
 
   updateNetwork(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
     this.computeBoundingBox(drawable);
-    this.dispose();
     this.updateNodes(drawable, decorations);
     this.updateEdges(drawable);
   }
@@ -30,11 +29,11 @@ export class SceneManager {
     drawable: IDrawableNetwork,
     decorations: Map<NodeId, Partial<IRectOptions>>,
   ): void {
-    this.nodeManager.render(drawable, decorations);
+    this.nodeManager.renderNodes(drawable, decorations);
   }
 
   private updateEdges(drawable: IDrawableNetwork): void {
-    this.edgeManager.render(drawable);
+    this.edgeManager.renderEdges(drawable);
   }
 
   private computeBoundingBox(drawable: IDrawableNetwork): void {
@@ -76,6 +75,14 @@ export class SceneManager {
   dispose(): void {
     this.nodeManager.dispose();
     this.edgeManager.dispose();
+
+    // Clear all objects from the scene
+    while (this.scene.children.length > 0) {
+      const child = this.scene.children[0];
+      this.scene.remove(child);
+    }
+
+    // Traverse any remaining objects and dispose them
     this.traverse(this.scene, (object) => {
       if (object.geometry) {
         object.geometry.dispose();

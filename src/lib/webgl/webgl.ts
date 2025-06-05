@@ -10,9 +10,17 @@ export abstract class WebGLManager {
     objects.forEach((object) => this.disposables.add(object));
   }
 
+  protected unregisterDisposable(object: Disposable): void {
+    this.disposables.delete(object);
+  }
+
   dispose(): void {
     for (const object of this.disposables) {
-      object.dispose();
+      try {
+        object.dispose();
+      } catch (error) {
+        console.error('🚨 failed to dispose object', error);
+      }
     }
     this.disposables.clear();
   }

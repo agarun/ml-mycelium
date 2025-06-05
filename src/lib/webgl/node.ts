@@ -5,23 +5,24 @@ import type { IDrawableNetwork } from '$lib/layout';
 import type { IRectOptions } from '$lib/ui';
 import type { INodeOptions } from '$lib/ui/node';
 import { Theme } from '$lib/ui';
-import WebGLRect from './rect';
-import WebGLText from './text';
-import WebGLExpandedModule from './expanded-module';
 import { DisplayObject, Container } from '$lib/scene';
 import { TextDisplayObject } from '$lib/ui/text';
-import { SceneManager } from './scene';
-import ExpandedModuleManager from './expanded-module';
+import { TextManager } from './text';
 import { WebGLManager } from './webgl';
+import { SceneManager } from './scene';
+import { ExpandedModuleManager } from './expanded-module';
+import WebGLRect from './rect';
 
 export class BadgeManager extends WebGLManager {
   private sceneManager: SceneManager;
+  private textManager: TextManager;
   private badges: Map<NodeId, THREE.Group>;
   private materials: Map<string, THREE.MeshBasicMaterial>;
 
-  constructor(sceneManager: SceneManager) {
+  constructor(sceneManager: SceneManager, textManager: TextManager) {
     super();
     this.sceneManager = sceneManager;
+    this.textManager = textManager;
     this.badges = new Map();
     this.materials = new Map();
   }
@@ -65,13 +66,14 @@ export class BadgeManager extends WebGLManager {
     this.registerDisposable(circleGeometry, circleMaterial, borderGeometry, borderMaterial);
 
     if (text) {
-      const textMesh = WebGLText.render(text, {
+      const textMesh = this.textManager.render(text, {
         fontSize: 12,
         foregroundColor: 'white',
         font: Theme.font.family,
         fontWeight: Theme.font.weight.bold,
       });
       textMesh.position.z = 0.1;
+      textMesh.sync();
       this.registerDisposable(textMesh);
 
       group.add(textMesh);
@@ -111,18 +113,22 @@ export class NodeManager extends WebGLManager {
   private sceneManager: SceneManager;
   private expandedModuleManager: ExpandedModuleManager;
   private badgeManager: BadgeManager;
+  private textManager: TextManager;
   private materials: Map<string, THREE.MeshBasicMaterial>;
   private meshes: Map<NodeId, THREE.Mesh>;
   private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
   private hoveredNodeId: NodeId | undefined;
   private selectedNodeIds: Set<NodeId>;
+  private lastDrawableHash: string | null = null;
+  private lastDecorationsHash: string | null = null;
 
   constructor(sceneManager: SceneManager) {
     super();
     this.sceneManager = sceneManager;
-    this.expandedModuleManager = new ExpandedModuleManager(this.sceneManager);
-    this.badgeManager = new BadgeManager(this.sceneManager);
+    this.textManager = new TextManager();
+    this.expandedModuleManager = new ExpandedModuleManager(this.sceneManager, this.textManager);
+    this.badgeManager = new BadgeManager(this.sceneManager, this.textManager);
 
     this.materials = new Map();
     this.meshes = new Map();
@@ -135,6 +141,120 @@ export class NodeManager extends WebGLManager {
 
   get interactiveNodes(): THREE.Object3D[] {
     return [...this.meshes.values(), ...this.expandedModuleManager.expandedModules.values()];
+  }
+
+  private drawableHash(drawable: IDrawableNetwork): string {
+    return JSON.stringify({
+      nodes: Array.from(drawable.nodes.entries()).map(([id, node]) => ({
+        id,
+        bb: node.boundingBox(),
+        options: node.options,
+        content: node.content ? this.displayObjectHash(node.content) : null,
+      })),
+      collapsed: Array.from(drawable.collapsed.entries()).map(([id, node]) => ({
+        id,
+        bb: node.boundingBox(),
+        options: node.options,
+        content: node.content ? this.displayObjectHash(node.content) : null,
+      })),
+      expanded: Array.from(drawable.expanded.entries()).map(([id, module]) => ({
+        id,
+        name: module.name,
+        bb: module.boundingBox,
+      })),
+    });
+  }
+
+  private displayObjectHash(obj: DisplayObject): any {
+    if (obj instanceof TextDisplayObject) {
+      return {
+        type: 'text',
+        text: obj.text,
+        transform: obj.transform,
+        options: obj.options,
+      };
+    } else if (obj instanceof Container) {
+      return {
+        type: 'container',
+        transform: obj.transform,
+        children: obj.children.map((child) => this.displayObjectHash(child)),
+      };
+    }
+    return { type: 'unknown', transform: obj.transform };
+  }
+
+  private decorationsHash(decorations: Map<NodeId, Partial<IRectOptions>>): string {
+    return JSON.stringify(Array.from(decorations.entries()));
+  }
+
+  needsUpdate(
+    drawable: IDrawableNetwork,
+    decorations: Map<NodeId, Partial<IRectOptions>>,
+  ): boolean {
+    const drawableHash = this.drawableHash(drawable);
+    const decorationsHash = this.decorationsHash(decorations);
+
+    const didDrawableUpdate = this.lastDrawableHash !== this.drawableHash(drawable);
+    const didDecorationsUpdate = this.lastDecorationsHash !== this.decorationsHash(decorations);
+
+    if (didDrawableUpdate) this.lastDrawableHash = drawableHash;
+    if (didDecorationsUpdate) this.lastDecorationsHash = decorationsHash;
+
+    return didDrawableUpdate || didDecorationsUpdate;
+  }
+
+  private clearNodes(): void {
+    for (const mesh of this.meshes.values()) {
+      this.sceneManager.scene.remove(mesh);
+      mesh.geometry.dispose();
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach((material: THREE.Material) => material.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    }
+    this.meshes.clear();
+
+    for (const border of this.borders.values()) {
+      this.sceneManager.scene.remove(border);
+      border.geometry.dispose();
+      if (Array.isArray(border.material)) {
+        border.material.forEach((material: THREE.Material) => material.dispose());
+      } else {
+        border.material.dispose();
+      }
+    }
+    this.borders.clear();
+
+    for (const group of this.contentGroups.values()) {
+      this.sceneManager.scene.remove(group);
+      group.traverse((object) => {
+        if (object instanceof Text) {
+          object.dispose();
+        } else if (object instanceof THREE.Mesh) {
+          object.geometry.dispose();
+          if (object.material instanceof THREE.Material) {
+            object.material.dispose();
+          } else if (Array.isArray(object.material)) {
+            object.material.forEach((material: THREE.Material) => material.dispose());
+          }
+        }
+      });
+    }
+    this.contentGroups.clear();
+
+    this.expandedModuleManager.dispose();
+    this.expandedModuleManager = new ExpandedModuleManager(this.sceneManager, this.textManager);
+
+    this.badgeManager.dispose();
+    this.badgeManager = new BadgeManager(this.sceneManager, this.textManager);
+  }
+
+  renderNodes(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
+    if (this.needsUpdate(drawable, decorations)) {
+      this.clearNodes();
+      this.render(drawable, decorations);
+    }
   }
 
   render(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
@@ -182,11 +302,7 @@ export class NodeManager extends WebGLManager {
       // Create expanded module with z-index based on nesting level
       // Higher nesting level = higher z-index (closer to camera)
       const zIndex = -0.5 + nestingLevel * 0.1; // Start at -0.5 and increment by 0.1 for each level
-      const moduleGroup = new WebGLExpandedModule(this.sceneManager).render(
-        module.name,
-        originalBB,
-        zIndex,
-      );
+      const moduleGroup = this.expandedModuleManager.render(module.name, originalBB, zIndex);
       moduleGroup.position.set(0, 0, 0);
       moduleGroup.userData.nodeId = nodeId;
       this.expandedModuleManager.expandedModules.set(nodeId, moduleGroup);
@@ -304,12 +420,13 @@ export class NodeManager extends WebGLManager {
     const displayObjectBB = displayObject.boundingBox();
 
     if (displayObject instanceof TextDisplayObject) {
-      const text = WebGLText.render(displayObject.text, displayObject.options);
+      const text = this.textManager.render(displayObject.text, displayObject.options);
       text.position.set(
         displayObjectPosX + displayObjectBB.width / 2,
         displayObjectPosY + displayObjectBB.height / 2,
         currentRelativeZ,
       );
+      text.sync(); // Sync after modifying position
       parent.add(text);
     } else if (displayObject instanceof Container) {
       const containerGroup = new THREE.Group();
@@ -332,19 +449,24 @@ export class NodeManager extends WebGLManager {
     // Get all interactive objects
     const objects = this.interactiveNodes;
 
-    // First do a bounding box check to filter objects
-    const frustum = new THREE.Frustum();
-    frustum.setFromProjectionMatrix(
-      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
-    );
+    // Early exit if no objects
+    if (objects.length === 0) return undefined;
 
-    const visibleObjects = objects.filter((obj) => {
-      const box = new THREE.Box3().setFromObject(obj);
-      return frustum.intersectsBox(box);
+    // Pre-filter objects by distance to reduce raycasting workload
+    const cameraPosition = camera.position;
+    const maxDistance = 1000;
+    const nearbyObjects = objects.filter((obj) => {
+      const distance = obj.position.distanceTo(cameraPosition);
+      return distance < maxDistance;
     });
 
-    // Then do precise raycasting only on visible objects
-    const intersects = raycaster.intersectObjects(visibleObjects, true);
+    // Limit the number of objects we test to improve performance
+    const maxObjectsToTest = 50;
+    const objectsToTest = nearbyObjects.slice(0, maxObjectsToTest);
+
+    // Only do precise raycasting on the filtered subset
+    const intersects = raycaster.intersectObjects(objectsToTest, true);
+
     if (intersects.length > 0) {
       // Find the first object with a nodeId in its userData
       const object = intersects[0].object;
@@ -477,51 +599,12 @@ export class NodeManager extends WebGLManager {
   }
 
   dispose(): void {
-    for (const mesh of this.meshes.values()) {
-      this.sceneManager.scene.remove(mesh);
-      mesh.geometry.dispose();
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((material: THREE.Material) => material.dispose());
-      } else {
-        mesh.material.dispose();
-      }
-    }
-    this.meshes.clear();
-
-    for (const border of this.borders.values()) {
-      this.sceneManager.scene.remove(border);
-      border.geometry.dispose();
-      if (Array.isArray(border.material)) {
-        border.material.forEach((material: THREE.Material) => material.dispose());
-      } else {
-        border.material.dispose();
-      }
-    }
-    this.borders.clear();
-
-    for (const group of this.contentGroups.values()) {
-      this.sceneManager.scene.remove(group);
-      group.traverse((object) => {
-        if (object instanceof Text) {
-          object.dispose();
-        } else if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (object.material instanceof THREE.Material) {
-            object.material.dispose();
-          } else if (Array.isArray(object.material)) {
-            object.material.forEach((material: THREE.Material) => material.dispose());
-          }
-        }
-      });
-    }
-    this.contentGroups.clear();
-
+    this.clearNodes();
     for (const material of this.materials.values()) {
       material.dispose();
     }
     this.materials.clear();
-    this.expandedModuleManager.dispose();
-    this.badgeManager.dispose();
+    this.textManager.dispose();
     super.dispose();
   }
 }
