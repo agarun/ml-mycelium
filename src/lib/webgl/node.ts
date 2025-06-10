@@ -2,7 +2,6 @@
 // Copyright (C) 2025 Apple Inc. All Rights Reserved.
 
 import * as THREE from 'three';
-import { Text } from 'troika-three-text';
 import type { NodeId } from '$lib/network';
 import type { IDrawableNetwork } from '$lib/layout';
 import type { IRectOptions } from '$lib/ui';
@@ -16,7 +15,7 @@ import { TextManager } from './text';
 import { WebGLManager } from './webgl';
 import { SceneManager } from './scene';
 import { ExpandedModuleManager } from './expanded-module';
-import WebGLRect from './rect';
+import { RectManager } from './rect';
 
 interface DisplayObjectHashResult {
   type: 'text' | 'container' | 'unknown';
@@ -100,29 +99,15 @@ export class BadgeManager extends WebGLManager {
     return group;
   }
 
-  dispose(): void {
+  clear(): void {
     for (const badge of this.badges.values()) {
       this.sceneManager.scene.remove(badge);
-      badge.traverse((object) => {
-        if ('geometry' in object && object.geometry) {
-          const geometry = object.geometry as THREE.BufferGeometry;
-          geometry.dispose();
-        }
-
-        if ('material' in object && object.material) {
-          const material = object.material as THREE.Material | THREE.Material[];
-          if (Array.isArray(material)) {
-            material.forEach((mat: THREE.Material) => {
-              mat.dispose();
-            });
-          } else {
-            material.dispose();
-          }
-        }
-      });
     }
     this.badges.clear();
+  }
 
+  dispose(): void {
+    this.clear();
     for (const material of this.materials.values()) {
       material.dispose();
     }
@@ -133,32 +118,49 @@ export class BadgeManager extends WebGLManager {
 
 export class NodeManager extends WebGLManager {
   private sceneManager: SceneManager;
+  private textManager: TextManager;
+  private rectManager: RectManager;
   private expandedModuleManager: ExpandedModuleManager;
   private badgeManager: BadgeManager;
-  private textManager: TextManager;
+
   private materials: Map<string, THREE.MeshBasicMaterial>;
+  private geometries: Map<string, THREE.BufferGeometry>;
   private meshes: Map<NodeId, THREE.Mesh>;
   private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
+
   private hoveredNodeId: NodeId | undefined;
   private selectedNodeIds: Set<NodeId>;
   private lastDrawableHash: string | null = null;
   private lastDecorationsHash: string | null = null;
 
+  private raycaster: THREE.Raycaster;
+  private vec2: THREE.Vector2;
+  private objects: THREE.Object3D[] = [];
+
   constructor(sceneManager: SceneManager) {
     super();
     this.sceneManager = sceneManager;
     this.textManager = new TextManager();
-    this.expandedModuleManager = new ExpandedModuleManager(this.sceneManager, this.textManager);
+    this.rectManager = new RectManager();
+    this.expandedModuleManager = new ExpandedModuleManager(
+      this.sceneManager,
+      this.textManager,
+      this.rectManager,
+    );
     this.badgeManager = new BadgeManager(this.sceneManager, this.textManager);
 
     this.materials = new Map();
+    this.geometries = new Map();
     this.meshes = new Map();
     this.borders = new Map();
     this.contentGroups = new Map();
 
     this.hoveredNodeId = undefined;
     this.selectedNodeIds = new Set();
+
+    this.raycaster = new THREE.Raycaster();
+    this.vec2 = new THREE.Vector2();
   }
 
   get interactiveNodes(): THREE.Object3D[] {
@@ -255,34 +257,27 @@ export class NodeManager extends WebGLManager {
     for (const group of this.contentGroups.values()) {
       this.sceneManager.scene.remove(group);
       group.traverse((object) => {
-        if (object instanceof Text) {
-          object.dispose();
-        } else {
-          if ('geometry' in object && object.geometry) {
-            const geometry = object.geometry as THREE.BufferGeometry;
-            geometry.dispose();
-          }
+        // Don't dispose Text objects - TextManager handles that
+        if ('geometry' in object && object.geometry) {
+          const geometry = object.geometry as THREE.BufferGeometry;
+          geometry.dispose();
+        }
 
-          if ('material' in object && object.material) {
-            const material = object.material as THREE.Material | THREE.Material[];
-            if (Array.isArray(material)) {
-              material.forEach((mat: THREE.Material) => {
-                mat.dispose();
-              });
-            } else {
-              material.dispose();
-            }
+        if ('material' in object && object.material) {
+          const material = object.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(material)) {
+            material.forEach((mat: THREE.Material) => {
+              mat.dispose();
+            });
+          } else {
+            material.dispose();
           }
         }
       });
     }
     this.contentGroups.clear();
-
-    this.expandedModuleManager.dispose();
-    this.expandedModuleManager = new ExpandedModuleManager(this.sceneManager, this.textManager);
-
-    this.badgeManager.dispose();
-    this.badgeManager = new BadgeManager(this.sceneManager, this.textManager);
+    this.expandedModuleManager.clear();
+    this.badgeManager.clear();
   }
 
   renderNodes(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
@@ -368,7 +363,7 @@ export class NodeManager extends WebGLManager {
         });
         this.materials.set(materialKey, material);
       }
-      const bgGeometry = WebGLRect.render(originalBB.width, originalBB.height, 6);
+      const bgGeometry = this.rectManager.render(originalBB.width, originalBB.height, 6);
       const bgMesh = new THREE.Mesh(bgGeometry, material);
       bgMesh.position.set(originalBB.center.x, originalBB.center.y, 0);
       bgMesh.userData.nodeId = nodeId;
@@ -384,7 +379,7 @@ export class NodeManager extends WebGLManager {
         initialBorderWidth = decoration.borderWidth;
       }
 
-      const borderGeometry = WebGLRect.render(
+      const borderGeometry = this.rectManager.render(
         originalBB.width,
         originalBB.height,
         6,
@@ -474,32 +469,32 @@ export class NodeManager extends WebGLManager {
   }
 
   getNodeAtPoint(point: THREE.Vector2, camera: THREE.Camera): NodeId | undefined {
-    const raycaster = new THREE.Raycaster();
-
-    // We need to flip the y coordinate since the camera is flipped
-    const transformedPoint = new THREE.Vector2(point.x, -point.y);
-    raycaster.setFromCamera(transformedPoint, camera);
+    // Flip the y coordinate since the camera is flipped
+    this.vec2.set(point.x, -point.y);
+    this.raycaster.setFromCamera(this.vec2, camera);
 
     // Get all interactive objects
     const objects = this.interactiveNodes;
-
-    // Early exit if no objects
     if (objects.length === 0) return undefined;
 
     // Pre-filter objects by distance to reduce raycasting workload
-    const cameraPosition = camera.position;
     const maxDistance = 1000;
-    const nearbyObjects = objects.filter((obj) => {
-      const distance = obj.position.distanceTo(cameraPosition);
-      return distance < maxDistance;
-    });
 
-    // Limit the number of objects we test to improve performance
+    this.objects.length = 0;
+    let count = 0;
     const maxObjectsToTest = 50;
-    const objectsToTest = nearbyObjects.slice(0, maxObjectsToTest);
+
+    for (let i = 0; i < objects.length && count < maxObjectsToTest; i++) {
+      const obj = objects[i];
+      const distance = obj.position.distanceTo(camera.position);
+      if (distance < maxDistance) {
+        this.objects[count] = obj;
+        count++;
+      }
+    }
 
     // Only do precise raycasting on the filtered subset
-    const intersects = raycaster.intersectObjects(objectsToTest, true);
+    const intersects = this.raycaster.intersectObjects(this.objects, true);
 
     if (intersects.length > 0) {
       // Find the first object with a nodeId in its userData
@@ -607,33 +602,67 @@ export class NodeManager extends WebGLManager {
       // finalBorderWidth remains baseBorderWidth for hover
     }
 
-    if (borderMesh.material instanceof THREE.MeshBasicMaterial) {
-      borderMesh.material.color.set(finalBorderColor);
-    } else {
-      const newMaterial = new THREE.MeshBasicMaterial({
+    const materialKey = `${finalBorderColor}_border`;
+    let material = this.materials.get(materialKey);
+
+    if (!material) {
+      material = new THREE.MeshBasicMaterial({
         color: finalBorderColor,
         transparent: true,
         opacity: 1,
+        side: THREE.DoubleSide,
       });
-      borderMesh.material instanceof THREE.Material && borderMesh.material.dispose();
-      borderMesh.material = newMaterial;
+      this.materials.set(materialKey, material);
+    }
+
+    if (borderMesh.material !== material) {
+      if (borderMesh.material instanceof THREE.MeshBasicMaterial) {
+        const currentColor = borderMesh.material.color.getHexString();
+        if (!this.materials.has(`#${currentColor}_border`)) {
+          borderMesh.material.dispose();
+        }
+      } else if (borderMesh.material instanceof THREE.Material) {
+        borderMesh.material.dispose();
+      }
+      borderMesh.material = material;
     }
 
     const oldBorderWidth = borderMesh.userData.currentBorderWidth as number;
     if (finalBorderWidth !== oldBorderWidth) {
-      borderMesh.geometry.dispose();
-      borderMesh.geometry = WebGLRect.render(nodeWidth, nodeHeight, 6, finalBorderWidth);
+      // Use geometry pool to avoid creating new geometries
+      const geometryKey = `${nodeWidth}_${nodeHeight}_6_${finalBorderWidth}`;
+      let geometry = this.geometries.get(geometryKey);
+
+      if (!geometry) {
+        geometry = this.rectManager.render(nodeWidth, nodeHeight, 6, finalBorderWidth);
+        this.geometries.set(geometryKey, geometry);
+      }
+
+      const oldGeometryKey = `${nodeWidth}_${nodeHeight}_6_${oldBorderWidth}`;
+      if (!this.geometries.has(oldGeometryKey)) {
+        borderMesh.geometry.dispose();
+      }
+
+      borderMesh.geometry = geometry;
       borderMesh.userData.currentBorderWidth = finalBorderWidth;
     }
   }
 
   dispose(): void {
-    this.clearNodes();
+    this.materials.clear();
     for (const material of this.materials.values()) {
       material.dispose();
     }
-    this.materials.clear();
+
+    for (const geometry of this.geometries.values()) {
+      geometry.dispose();
+    }
+    this.geometries.clear();
+
+    this.clearNodes();
+
     this.textManager.dispose();
+    this.rectManager.dispose();
     super.dispose();
   }
 }

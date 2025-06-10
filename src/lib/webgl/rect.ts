@@ -3,13 +3,24 @@
 
 import * as THREE from 'three';
 
-const Rect = {
-  render(
+export class RectManager {
+  private rects: Map<string, THREE.BufferGeometry> = new Map();
+
+  private key(
     width: number,
     height: number,
     radius: number,
     borderThickness: number | null = null,
-  ): THREE.BufferGeometry {
+  ): string {
+    return `${width.toFixed(2)}_${height.toFixed(2)}_${radius}_${borderThickness || 'null'}`;
+  }
+
+  private rect(
+    width: number,
+    height: number,
+    radius: number,
+    borderThickness: number | null = null,
+  ): THREE.Shape {
     const shape = new THREE.Shape();
     const x = -width / 2;
     const y = -height / 2;
@@ -50,8 +61,31 @@ const Rect = {
       shape.holes.push(hole);
     }
 
-    return new THREE.ShapeGeometry(shape);
-  },
-};
+    return shape;
+  }
 
-export default Rect;
+  render(
+    width: number,
+    height: number,
+    radius: number,
+    borderThickness: number | null = null,
+  ): THREE.BufferGeometry {
+    const key = this.key(width, height, radius, borderThickness);
+    if (!this.rects.has(key)) {
+      const shape = this.rect(width, height, radius, borderThickness);
+      const geometry = new THREE.ShapeGeometry(shape);
+      this.rects.set(key, geometry);
+    }
+
+    const rect = this.rects.get(key);
+    if (!rect) throw new Error(`could not retrieve geometry for key: ${key}`);
+    return rect;
+  }
+
+  dispose(): void {
+    for (const geometry of this.rects.values()) {
+      geometry.dispose();
+    }
+    this.rects.clear();
+  }
+}

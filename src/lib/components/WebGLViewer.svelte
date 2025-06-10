@@ -43,6 +43,7 @@
   let isDragging = false;
   let hoveredNodeId: NodeId | undefined;
   let lastClickTime = 0;
+  let lastRaycastTime = 0;
   const DOUBLE_CLICK_THRESHOLD = 300; // ms
 
   const dispatch = createEventDispatcher<
@@ -111,23 +112,29 @@
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
 
-    // Find if a node is currently being hovered
-    const nodeId = sceneManager.getNodeAtPoint(mouse, cameraManager.camera);
+    const now = performance.now();
+    const shouldRaycast = now - lastRaycastTime >= 16; // 16ms per framew
+    if (shouldRaycast) {
+      lastRaycastTime = now;
 
-    // Only update the hover state if it's a different node being hovered
-    if (nodeId !== hoveredNodeId) {
-      if (hoveredNodeId) {
-        dispatch('nodeLeave', { nodeId: hoveredNodeId });
-        sceneManager.hoverNode(undefined);
+      // Find if a node is currently being hovered
+      const nodeId = sceneManager.getNodeAtPoint(mouse, cameraManager.camera);
+
+      // Only update the hover state if it's a different node being hovered
+      if (nodeId !== hoveredNodeId) {
+        if (hoveredNodeId) {
+          dispatch('nodeLeave', { nodeId: hoveredNodeId });
+          sceneManager.hoverNode(undefined);
+        }
+
+        if (nodeId) {
+          dispatch('nodeEnter', { nodeId });
+          sceneManager.hoverNode(nodeId);
+        }
+
+        hoveredNodeId = nodeId;
+        requestRender();
       }
-
-      if (nodeId) {
-        dispatch('nodeEnter', { nodeId });
-        sceneManager.hoverNode(nodeId);
-      }
-
-      hoveredNodeId = nodeId;
-      requestRender();
     }
 
     if (!isDragging) return;

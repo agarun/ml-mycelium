@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Theme } from '$lib/ui';
 import { BoundingBox } from '$lib/geometry';
 import type { NodeId } from '$lib/network';
-import WebGLRect from './rect';
+import { RectManager } from './rect';
 import { Text } from 'troika-three-text';
 import { TextManager } from './text';
 import { SceneManager } from './scene';
@@ -14,15 +14,17 @@ import { WebGLManager } from './webgl';
 export class ExpandedModuleManager extends WebGLManager {
   private sceneManager: SceneManager;
   private textManager: TextManager;
+  private rectManager: RectManager;
   public expandedModules: Map<NodeId, THREE.Group>;
   private material: THREE.MeshBasicMaterial;
   private borderMaterial: THREE.MeshBasicMaterial;
   private hoveredNodeId: NodeId | undefined;
 
-  constructor(sceneManager: SceneManager, textManager: TextManager) {
+  constructor(sceneManager: SceneManager, textManager: TextManager, rectManager: RectManager) {
     super();
     this.sceneManager = sceneManager;
     this.textManager = textManager;
+    this.rectManager = rectManager;
     this.expandedModules = new Map();
     this.material = new THREE.MeshBasicMaterial({
       color: 'rgb(250,250,250)',
@@ -77,12 +79,12 @@ export class ExpandedModuleManager extends WebGLManager {
   render(name: string, bb: BoundingBox, zIndex: number = 0): THREE.Group {
     const group = new THREE.Group();
 
-    const bgGeometry = WebGLRect.render(bb.width, bb.height, 6);
+    const bgGeometry = this.rectManager.render(bb.width, bb.height, 6);
     const bgMesh = new THREE.Mesh(bgGeometry, this.material);
     bgMesh.position.set(bb.center.x, bb.center.y, zIndex);
     group.add(bgMesh);
 
-    const borderGeometry = WebGLRect.render(bb.width, bb.height, 6, 1);
+    const borderGeometry = this.rectManager.render(bb.width, bb.height, 6, 1);
     const border = new THREE.Mesh(borderGeometry, this.borderMaterial);
     border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
@@ -102,34 +104,18 @@ export class ExpandedModuleManager extends WebGLManager {
     return group;
   }
 
-  dispose(): void {
-    this.material.dispose();
-    this.borderMaterial.dispose();
+  clear(): void {
     for (const module of this.expandedModules.values()) {
       this.sceneManager.scene.remove(module);
-      for (const child of module.children) {
-        if ('geometry' in child && child.geometry) {
-          const geometry = child.geometry as THREE.BufferGeometry;
-          geometry.dispose();
-        }
-
-        if ('material' in child && child.material) {
-          const material = child.material as THREE.Material | THREE.Material[];
-          if (Array.isArray(material)) {
-            material.forEach((mat: THREE.Material) => {
-              mat.dispose();
-            });
-          } else {
-            material.dispose();
-          }
-        }
-
-        if (child instanceof Text) {
-          child.dispose();
-        }
-      }
     }
     this.expandedModules.clear();
+    this.hoveredNodeId = undefined;
+  }
+
+  dispose(): void {
+    this.clear();
+    this.material.dispose();
+    this.borderMaterial.dispose();
     super.dispose();
   }
 }
