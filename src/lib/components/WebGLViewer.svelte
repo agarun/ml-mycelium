@@ -373,6 +373,7 @@
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   $: if (viewport && cameraManager) {
     cameraManager.update();
+    rendererManager.updateSize();
     requestRender();
   }
 

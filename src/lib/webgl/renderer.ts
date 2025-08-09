@@ -12,17 +12,18 @@ export class RendererManager {
     this.viewport = viewport;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: true, // can be disabled if low fps
       alpha: true,
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
       powerPreference: 'high-performance',
     });
+    this.renderer.sortObjects = false;
     this.updateSize();
   }
 
   updateSize(): void {
     const canvas = this.renderer.domElement;
-    const dpr = window.devicePixelRatio;
+    const dpr = Math.min(1.5, window.devicePixelRatio);
     const width = Math.floor(canvas.clientWidth * dpr);
     const height = Math.floor(canvas.clientHeight * dpr);
 

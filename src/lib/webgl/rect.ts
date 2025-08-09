@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 export class RectManager {
   private rects: Map<string, THREE.BufferGeometry> = new Map();
+  private static readonly MAX_CACHE_SIZE = 2000;
 
   private key(
     width: number,
@@ -12,7 +13,10 @@ export class RectManager {
     radius: number,
     borderThickness: number | null = null,
   ): string {
-    return `${width.toFixed(2)}_${height.toFixed(2)}_${radius}_${borderThickness || 'null'}`;
+    // Coalesce sizes to increase geometry reuse
+    const w = Math.round(width);
+    const h = Math.round(height);
+    return `${w}_${h}_${radius}_${borderThickness ?? 'null'}`;
   }
 
   private rect(
@@ -73,8 +77,18 @@ export class RectManager {
     const key = this.key(width, height, radius, borderThickness);
     if (!this.rects.has(key)) {
       const shape = this.rect(width, height, radius, borderThickness);
-      const geometry = new THREE.ShapeGeometry(shape);
+      const curveSegments = 4; // reduce complexity of rounded corners
+      const geometry = new THREE.ShapeGeometry(shape, curveSegments);
       this.rects.set(key, geometry);
+      // simple FIFO eviction to prevent unbounded growth
+      if (this.rects.size > RectManager.MAX_CACHE_SIZE) {
+        const firstKey = this.rects.keys().next().value as string | undefined;
+        if (firstKey) {
+          const geom = this.rects.get(firstKey);
+          if (geom) geom.dispose();
+          this.rects.delete(firstKey);
+        }
+      }
     }
 
     const rect = this.rects.get(key);
