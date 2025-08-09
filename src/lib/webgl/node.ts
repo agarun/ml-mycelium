@@ -16,6 +16,7 @@ import { WebGLManager } from './webgl';
 import { SceneManager } from './scene';
 import { ExpandedModuleManager } from './expanded-module';
 import { RectManager } from './rect';
+import { InstancedRoundedRectManager, type RoundedRectInstance } from './instanced-rounded-rect';
 
 interface DisplayObjectHashResult {
   type: 'text' | 'container' | 'unknown';
@@ -128,6 +129,11 @@ export class NodeManager extends WebGLManager {
   private meshes: Map<NodeId, THREE.Mesh>;
   private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
+  private instancedRects: InstancedRoundedRectManager;
+  private nodeIdToInstanceIndex: Map<NodeId, number>;
+  private instanceIndexToNodeId: Map<number, NodeId>;
+  private nodeIdToBaseBorderColor: Map<NodeId, string>;
+  private nodeIdToBaseBorderWidth: Map<NodeId, number>;
 
   private hoveredNodeId: NodeId | undefined;
   private selectedNodeIds: Set<NodeId>;
@@ -156,6 +162,11 @@ export class NodeManager extends WebGLManager {
     this.meshes = new Map();
     this.borders = new Map();
     this.contentGroups = new Map();
+    this.instancedRects = new InstancedRoundedRectManager();
+    this.nodeIdToInstanceIndex = new Map();
+    this.instanceIndexToNodeId = new Map();
+    this.nodeIdToBaseBorderColor = new Map();
+    this.nodeIdToBaseBorderWidth = new Map();
 
     this.hoveredNodeId = undefined;
     this.selectedNodeIds = new Set();
@@ -165,7 +176,9 @@ export class NodeManager extends WebGLManager {
   }
 
   get interactiveNodes(): THREE.Object3D[] {
-    return [...this.meshes.values(), ...this.expandedModuleManager.expandedModules.values()];
+    const items: THREE.Object3D[] = [...this.expandedModuleManager.expandedModules.values()];
+    if (this.instancedRects.mesh) items.push(this.instancedRects.mesh);
+    return items;
   }
 
   private drawableHash(drawable: IDrawableNetwork): string {
@@ -229,6 +242,13 @@ export class NodeManager extends WebGLManager {
   }
 
   private clearNodes(): void {
+    if (this.instancedRects.mesh) {
+      this.sceneManager.scene.remove(this.instancedRects.mesh);
+    }
+    this.nodeIdToInstanceIndex.clear();
+    this.instanceIndexToNodeId.clear();
+    this.nodeIdToBaseBorderColor.clear();
+    this.nodeIdToBaseBorderWidth.clear();
     for (const mesh of this.meshes.values()) {
       this.sceneManager.scene.remove(mesh);
       mesh.geometry.dispose();
@@ -343,67 +363,60 @@ export class NodeManager extends WebGLManager {
 
     // Update both expanded and collapsed nodes
     const allNodes = [...drawable.nodes.entries(), ...drawable.collapsed.entries()];
+
+    // Build instanced bg+border batch
+    this.instancedRects.begin(allNodes.length);
+    if (
+      this.instancedRects.mesh &&
+      !this.sceneManager.scene.children.includes(this.instancedRects.mesh)
+    ) {
+      this.sceneManager.scene.add(this.instancedRects.mesh);
+    }
+
+    let instanceIndex = 0;
     for (const [nodeId, entity] of allNodes) {
       const originalBB = entity.boundingBox();
       const decoration = decorations.get(nodeId);
 
-      // Create node background
-      let initialBgColor = entity.options.backgroundColor || Theme.colors.white;
-      if (decoration?.backgroundColor) {
-        initialBgColor = decoration.backgroundColor;
-      }
-      const materialKey = initialBgColor;
-      let material = this.materials.get(materialKey);
+      // Colors and border from options/decorations
+      let bgColor = entity.options.backgroundColor || Theme.colors.white;
+      if (decoration?.backgroundColor) bgColor = decoration.backgroundColor;
+      let borderColor = entity.options.borderColor || Theme.colors.foreground.grayTertiary;
+      if (decoration?.borderColor) borderColor = decoration.borderColor;
+      let borderWidth = 1;
+      if (decoration?.borderWidth !== undefined) borderWidth = decoration.borderWidth;
 
-      if (!material) {
-        material = new THREE.MeshBasicMaterial({
-          color: initialBgColor,
-          transparent: false,
-          opacity: 1,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          depthTest: false,
-        });
-        this.materials.set(materialKey, material);
-      }
-      const bgGeometry = this.rectManager.render(originalBB.width, originalBB.height, 6);
-      const bgMesh = new THREE.Mesh(bgGeometry, material);
-      bgMesh.position.set(originalBB.center.x, originalBB.center.y, 0);
-      bgMesh.userData.nodeId = nodeId;
+      // Store base border values for later state updates
+      this.nodeIdToBaseBorderColor.set(nodeId, borderColor);
+      this.nodeIdToBaseBorderWidth.set(nodeId, borderWidth);
 
-      // Create node border
-      let initialBorderColor = entity.options.borderColor || Theme.colors.foreground.grayTertiary;
-      let initialBorderWidth = 1;
-
-      if (decoration?.borderColor) {
-        initialBorderColor = decoration.borderColor;
+      const fill = new THREE.Color().setStyle(bgColor);
+      const border = new THREE.Color().setStyle(borderColor);
+      const inst: RoundedRectInstance = {
+        centerX: originalBB.center.x,
+        centerY: originalBB.center.y,
+        z: 0,
+        width: originalBB.width,
+        height: originalBB.height,
+        radius: 8,
+        borderWidth,
+        fillR: fill.r,
+        fillG: fill.g,
+        fillB: fill.b,
+        fillA: 1,
+        borderR: border.r,
+        borderG: border.g,
+        borderB: border.b,
+        borderA: 1,
+      };
+      this.instancedRects.setInstance(instanceIndex, inst);
+      // Set userData on the instanced mesh once for picking clarity
+      if (this.instancedRects.mesh && !this.instancedRects.mesh.userData.kind) {
+        this.instancedRects.mesh.userData.kind = 'nodeRect';
       }
-      if (decoration?.borderWidth !== undefined) {
-        initialBorderWidth = decoration.borderWidth;
-      }
-
-      const borderGeometry = this.rectManager.render(
-        originalBB.width,
-        originalBB.height,
-        6,
-        initialBorderWidth,
-      );
-      const borderMaterial = new THREE.MeshBasicMaterial({
-        color: initialBorderColor,
-        transparent: false,
-        opacity: 1,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        depthTest: false,
-      });
-      const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
-      borderMesh.position.set(originalBB.center.x, originalBB.center.y, 0.1);
-      borderMesh.userData.nodeId = nodeId;
-      borderMesh.userData.nodeOptions = entity.options;
-      borderMesh.userData.decorationOptions = decoration;
-      borderMesh.userData.nodeWidth = originalBB.width;
-      borderMesh.userData.nodeHeight = originalBB.height;
-      borderMesh.userData.currentBorderWidth = initialBorderWidth;
+      this.nodeIdToInstanceIndex.set(nodeId, instanceIndex);
+      this.instanceIndexToNodeId.set(instanceIndex, nodeId);
+      instanceIndex++;
 
       const contentGroup = new THREE.Group();
       contentGroup.position.set(
@@ -428,16 +441,14 @@ export class NodeManager extends WebGLManager {
         // badgeGroup may include text created by TextManager.render()
       }
 
-      this.meshes.set(nodeId, bgMesh);
-      this.borders.set(nodeId, borderMesh);
-      this.sceneManager.scene.add(bgMesh);
-      this.sceneManager.scene.add(borderMesh);
+      // Remove per-node bg/border meshes; replaced by instancing
     }
+    this.instancedRects.end();
 
     // Reapply states
     this.selectedNodeIds = currentSelectedIds;
     this.hoveredNodeId = currentHoveredId;
-    for (const [nodeId] of this.borders) {
+    for (const [nodeId] of this.nodeIdToInstanceIndex) {
       this.setState(nodeId, {
         isHovered: nodeId === currentHoveredId,
         isSelected: currentSelectedIds.has(nodeId),
@@ -491,8 +502,15 @@ export class NodeManager extends WebGLManager {
     let count = 0;
     const maxObjectsToTest = 50;
 
+    // Always include the instanced rects mesh to enable picking of nodes
+    if (this.instancedRects.mesh) {
+      this.objects[count] = this.instancedRects.mesh;
+      count++;
+    }
+
     for (let i = 0; i < objects.length && count < maxObjectsToTest; i++) {
       const obj = objects[i];
+      if (this.instancedRects.mesh && obj === this.instancedRects.mesh) continue; // already added
       const distance = obj.position.distanceTo(camera.position);
       if (distance < maxDistance) {
         this.objects[count] = obj;
@@ -504,14 +522,28 @@ export class NodeManager extends WebGLManager {
     const intersects = this.raycaster.intersectObjects(this.objects, true);
 
     if (intersects.length > 0) {
-      // Find the first object with a nodeId in its userData
-      const object = intersects[0].object;
-      let current: THREE.Object3D | null = object;
-      while (current) {
-        if (current.userData.nodeId) {
-          return current.userData.nodeId as NodeId;
+      // First handle instanced rect hit (has instanceId)
+      for (const hit of intersects) {
+        if (
+          typeof hit.instanceId === 'number' &&
+          this.instancedRects.mesh &&
+          hit.object === this.instancedRects.mesh
+        ) {
+          const idx = hit.instanceId;
+          const nodeId = this.instanceIndexToNodeId.get(idx);
+          if (nodeId) return nodeId;
         }
-        current = current.parent;
+      }
+
+      // Otherwise, find first object with a nodeId in userData (expanded modules, etc.)
+      for (const hit of intersects) {
+        let current: THREE.Object3D | null = hit.object;
+        while (current) {
+          if (current.userData.nodeId) {
+            return current.userData.nodeId as NodeId;
+          }
+          current = current.parent;
+        }
       }
     }
     return undefined;
@@ -567,34 +599,18 @@ export class NodeManager extends WebGLManager {
       isSelected: false,
     },
   ): void {
-    const borderMesh = this.borders.get(nodeId);
-    if (!borderMesh) return;
-
-    const nodeOpts = borderMesh.userData.nodeOptions as INodeOptions | undefined;
-    const decorOpts = borderMesh.userData.decorationOptions as Partial<IRectOptions> | undefined;
-    const nodeWidth = borderMesh.userData.nodeWidth as number;
-    const nodeHeight = borderMesh.userData.nodeHeight as number;
+    const instanceIndex = this.nodeIdToInstanceIndex.get(nodeId);
+    if (instanceIndex === undefined) return;
 
     // Defaults
     let baseBorderColor: string = Theme.colors.foreground.grayTertiary; // Explicitly typed as string
     let baseBorderWidth = 1; // Default border width
 
-    // 1. Apply NodeOptions
-    if (nodeOpts) {
-      baseBorderColor = nodeOpts.borderColor || baseBorderColor;
-      // INodeOptions does not have borderWidth, so we don't source it from nodeOpts directly for width.
-      // Border width default is 1, overridden by decoration, then by selection state.
-    }
-
-    // 2. Apply Decorations (override NodeOptions for color, set width if defined)
-    if (decorOpts) {
-      if (decorOpts.borderColor) {
-        baseBorderColor = decorOpts.borderColor;
-      }
-      if (decorOpts.borderWidth !== undefined) {
-        baseBorderWidth = decorOpts.borderWidth;
-      }
-    }
+    // Source base values from what we recorded during render()
+    const storedColor = this.nodeIdToBaseBorderColor.get(nodeId);
+    const storedWidth = this.nodeIdToBaseBorderWidth.get(nodeId);
+    if (storedColor) baseBorderColor = storedColor;
+    if (storedWidth !== undefined) baseBorderWidth = storedWidth;
 
     const { isHovered = false, isSelected = false } = options;
 
@@ -609,52 +625,14 @@ export class NodeManager extends WebGLManager {
       // finalBorderWidth remains baseBorderWidth for hover
     }
 
-    const materialKey = `${finalBorderColor}_border`;
-    let material = this.materials.get(materialKey);
-
-    if (!material) {
-      material = new THREE.MeshBasicMaterial({
-        color: finalBorderColor,
-        transparent: false,
-        opacity: 1,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        depthTest: false,
-      });
-      this.materials.set(materialKey, material);
-    }
-
-    if (borderMesh.material !== material) {
-      if (borderMesh.material instanceof THREE.MeshBasicMaterial) {
-        const currentColor = borderMesh.material.color.getHexString();
-        if (!this.materials.has(`#${currentColor}_border`)) {
-          borderMesh.material.dispose();
-        }
-      } else if (borderMesh.material instanceof THREE.Material) {
-        borderMesh.material.dispose();
-      }
-      borderMesh.material = material;
-    }
-
-    const oldBorderWidth = borderMesh.userData.currentBorderWidth as number;
-    if (finalBorderWidth !== oldBorderWidth) {
-      // Use geometry pool to avoid creating new geometries
-      const geometryKey = `${nodeWidth}_${nodeHeight}_6_${finalBorderWidth}`;
-      let geometry = this.geometries.get(geometryKey);
-
-      if (!geometry) {
-        geometry = this.rectManager.render(nodeWidth, nodeHeight, 6, finalBorderWidth);
-        this.geometries.set(geometryKey, geometry);
-      }
-
-      const oldGeometryKey = `${nodeWidth}_${nodeHeight}_6_${oldBorderWidth}`;
-      if (!this.geometries.has(oldGeometryKey)) {
-        borderMesh.geometry.dispose();
-      }
-
-      borderMesh.geometry = geometry;
-      borderMesh.userData.currentBorderWidth = finalBorderWidth;
-    }
+    const border = new THREE.Color().setStyle(finalBorderColor);
+    // If hover/selected, push border color only; else restore base
+    this.instancedRects.updateBorder(instanceIndex, finalBorderWidth, {
+      r: border.r,
+      g: border.g,
+      b: border.b,
+      a: 1,
+    });
   }
 
   dispose(): void {
