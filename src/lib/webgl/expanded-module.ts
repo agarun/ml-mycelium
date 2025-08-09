@@ -93,17 +93,17 @@ export class ExpandedModuleManager extends WebGLManager {
     border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
 
-    // const textMesh = this.textManager.render(name, {
-    //   fontSize: 16,
-    //   font: Theme.font.family,
-    //   fontWeight: Theme.font.weight.regular,
-    // });
-    // textMesh.anchorX = 'left';
-    // textMesh.anchorY = 'top';
-    // textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
-    // textMesh.sync();
-    // this.registerDisposable(textMesh);
-    // group.add(textMesh);
+    const textMesh = this.textManager.render(name, {
+      fontSize: 16,
+      font: Theme.font.family,
+      fontWeight: Theme.font.weight.regular,
+    });
+    textMesh.anchorX = 'left';
+    textMesh.anchorY = 'top';
+    textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
+    textMesh.sync();
+    this.registerDisposable(textMesh);
+    group.add(textMesh);
 
     return group;
   }

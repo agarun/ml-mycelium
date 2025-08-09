@@ -77,19 +77,19 @@ export class BadgeManager extends WebGLManager {
 
     this.registerDisposable(circleGeometry, circleMaterial, borderGeometry, borderMaterial);
 
-    // if (text) {
-    //   const textMesh = this.textManager.render(text, {
-    //     fontSize: 12,
-    //     foregroundColor: 'white',
-    //     font: Theme.font.family,
-    //     fontWeight: Theme.font.weight.bold,
-    //   });
-    //   textMesh.position.z = 0.1;
-    //   textMesh.sync();
-    //   this.registerDisposable(textMesh);
+    if (text) {
+      const textMesh = this.textManager.render(text, {
+        fontSize: 12,
+        foregroundColor: 'white',
+        font: Theme.font.family,
+        fontWeight: Theme.font.weight.bold,
+      });
+      textMesh.position.z = 0.1;
+      textMesh.sync();
+      this.registerDisposable(textMesh);
 
-    //   group.add(textMesh);
-    // }
+      group.add(textMesh);
+    }
 
     group.position.copy(position);
     group.userData.nodeId = nodeId;
@@ -141,7 +141,8 @@ export class NodeManager extends WebGLManager {
   constructor(sceneManager: SceneManager) {
     super();
     this.sceneManager = sceneManager;
-    this.textManager = new TextManager();
+    // Reuse SceneManager's TextManager for centralized visibility control
+    this.textManager = this.sceneManager.getTextManager();
     this.rectManager = new RectManager();
     this.expandedModuleManager = new ExpandedModuleManager(
       this.sceneManager,
@@ -417,12 +418,14 @@ export class NodeManager extends WebGLManager {
 
       if (entity.options.badge) {
         const badgePosition = new THREE.Vector3(originalBB.xMax + 1, originalBB.yMin - 1, 1.0);
-        this.badgeManager.render(
+        const _badgeGroup = this.badgeManager.render(
           nodeId,
           entity.options.badge.color,
           entity.options.badge.text,
           badgePosition,
         );
+        // No need to track text explicitly; TextManager tracks active instances
+        // badgeGroup may include text created by TextManager.render()
       }
 
       this.meshes.set(nodeId, bgMesh);
@@ -453,14 +456,14 @@ export class NodeManager extends WebGLManager {
     const displayObjectBB = displayObject.boundingBox();
 
     if (displayObject instanceof TextDisplayObject) {
-      // const text = this.textManager.render(displayObject.text, displayObject.options);
-      // text.position.set(
-      //   displayObjectPosX + displayObjectBB.width / 2,
-      //   displayObjectPosY + displayObjectBB.height / 2,
-      //   currentRelativeZ,
-      // );
-      // text.sync(); // Sync after modifying position
-      // parent.add(text);
+      const text = this.textManager.render(displayObject.text, displayObject.options);
+      text.position.set(
+        displayObjectPosX + displayObjectBB.width / 2,
+        displayObjectPosY + displayObjectBB.height / 2,
+        currentRelativeZ,
+      );
+      text.sync(); // Sync after modifying position
+      parent.add(text);
     } else if (displayObject instanceof Container) {
       const containerGroup = new THREE.Group();
       containerGroup.position.set(displayObjectPosX, displayObjectPosY, currentRelativeZ);
