@@ -22,12 +22,16 @@ export class EdgeManager extends WebGLManager {
       linewidth: 0.5,
       transparent: true,
       opacity: 0.5,
+      depthWrite: false,
+      depthTest: false,
     });
     this.arrowMaterial = new THREE.MeshBasicMaterial({
       color: Theme.colors.foreground.grayTertiary,
-      transparent: true,
+      transparent: false,
       opacity: 1,
       side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
     });
     this.edges = new THREE.Group();
     this.sceneManager = sceneManager;

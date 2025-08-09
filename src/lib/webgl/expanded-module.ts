@@ -28,15 +28,19 @@ export class ExpandedModuleManager extends WebGLManager {
     this.expandedModules = new Map();
     this.material = new THREE.MeshBasicMaterial({
       color: 'rgb(250,250,250)',
-      transparent: true,
+      transparent: false,
       opacity: 1,
       side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
     });
     this.borderMaterial = new THREE.MeshBasicMaterial({
       color: 'rgb(134, 134, 139)',
-      transparent: true,
+      transparent: false,
       opacity: 1,
       side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
     });
   }
 
@@ -89,18 +93,18 @@ export class ExpandedModuleManager extends WebGLManager {
     border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
 
-    const textMesh = this.textManager.render(name, {
-      fontSize: 16,
-      font: Theme.font.family,
-      fontWeight: Theme.font.weight.regular,
-    });
-    textMesh.anchorX = 'left';
-    textMesh.anchorY = 'top';
-    textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
-    textMesh.sync();
-    this.registerDisposable(textMesh);
+    // const textMesh = this.textManager.render(name, {
+    //   fontSize: 16,
+    //   font: Theme.font.family,
+    //   fontWeight: Theme.font.weight.regular,
+    // });
+    // textMesh.anchorX = 'left';
+    // textMesh.anchorY = 'top';
+    // textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
+    // textMesh.sync();
+    // this.registerDisposable(textMesh);
+    // group.add(textMesh);
 
-    group.add(textMesh);
     return group;
   }
 
