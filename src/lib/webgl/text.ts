@@ -44,6 +44,7 @@ export class TextManager extends WebGLManager {
       textMesh.text = text;
       textMesh.fontSize = options.fontSize - 1;
       textMesh.color = options.foregroundColor || baseColor || Theme.colors.foreground.gray;
+      textMesh.sdfGlyphSize = 2;
 
       if (options.font && options.font in FONTS) {
         const font = options.font as keyof typeof FONTS;

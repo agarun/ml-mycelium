@@ -5,6 +5,11 @@ declare module 'troika-three-text' {
   import type { Color, Material, MeshBasicMaterial, MeshStandardMaterial } from 'three';
   import { Object3D } from 'three';
 
+  export function preloadFont(
+    font: { font: string; characters: string },
+    callback: () => void,
+  ): void;
+
   export class Text extends Object3D {
     constructor();
     text: string;
@@ -25,6 +30,7 @@ declare module 'troika-three-text' {
     whiteSpace: 'normal' | 'nowrap';
     outlineWidth: number;
     outlineColor: string | number | Color;
+    sdfGlyphSize: number;
     sync: () => void;
     dispose(): void;
   }
