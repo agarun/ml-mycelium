@@ -28,3 +28,7 @@ export abstract class WebGLManager {
     this.disposables.clear();
   }
 }
+
+// Text visibility threshold relative to world zoom scale.
+// When viewport.scale() < TEXT_VISIBILITY_SCALE_THRESHOLD, text will be hidden.
+export const TEXT_VISIBILITY_SCALE_THRESHOLD = 0.2;
