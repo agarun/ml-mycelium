@@ -38,16 +38,15 @@ export class RendererManager {
   }
 
   updateSize(): void {
-    const canvas = this.renderer.domElement;
-    const dpr = Math.min(1.5, window.devicePixelRatio);
-    const width = Math.floor(canvas.clientWidth * dpr);
-    const height = Math.floor(canvas.clientHeight * dpr);
+    // Use the Viewport as the single source of truth for renderer size.
+    // This avoids mismatches with canvas attributes and browser zoom DPR.
+    const width = Math.max(1, Math.floor(this.viewport.screenWidth()));
+    const height = Math.max(1, Math.floor(this.viewport.screenHeight()));
 
-    if (canvas.width !== width || canvas.height !== height) {
-      this.renderer.setSize(width, height, false);
-    }
-
-    this.renderer.setPixelRatio(dpr);
+    // Lock pixel ratio to 1 for stability across browser zoom levels.
+    // Improves consistency of projection and raycasting at the cost of HiDPI crispness.
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(width, height, false);
   }
 
   render(scene: THREE.Scene, camera: THREE.Camera): void {

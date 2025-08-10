@@ -12,6 +12,7 @@ export interface RoundedRectInstance {
   height: number;
   radius: number;
   borderWidth: number;
+  dashLength?: number; // 0 or undefined => solid
   fillR: number;
   fillG: number;
   fillB: number;
@@ -32,6 +33,7 @@ export class InstancedRoundedRectManager extends WebGLManager {
   private aBorderWidth: THREE.InstancedBufferAttribute | null = null; // float
   private aFillColor: THREE.InstancedBufferAttribute | null = null; // vec4
   private aBorderColor: THREE.InstancedBufferAttribute | null = null; // vec4
+  private aDashLength: THREE.InstancedBufferAttribute | null = null; // float
 
   private createMaterial(): THREE.ShaderMaterial {
     const vertexShader = `
@@ -40,12 +42,14 @@ export class InstancedRoundedRectManager extends WebGLManager {
       attribute float aBorderWidth;
       attribute vec4 aFillColor;
       attribute vec4 aBorderColor;
+      attribute float aDashLength;
       varying vec2 vLocal;
       varying vec2 vHalfSize;
       varying float vRadius;
       varying float vBorderWidth;
       varying vec4 vFillColor;
       varying vec4 vBorderColor;
+      varying float vDashLength;
       void main() {
         // local rect-space coords for SDF
         vLocal = position.xy * aSize;
@@ -54,6 +58,7 @@ export class InstancedRoundedRectManager extends WebGLManager {
         vBorderWidth = aBorderWidth;
         vFillColor = aFillColor;
         vBorderColor = aBorderColor;
+        vDashLength = aDashLength;
         // final position: instanceMatrix includes translation and scale
         gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
       }
@@ -69,12 +74,14 @@ export class InstancedRoundedRectManager extends WebGLManager {
       varying float vBorderWidth;
       varying vec4 vFillColor;
       varying vec4 vBorderColor;
+      varying float vDashLength;
       uniform float uBorderScale;
 
       float sdRoundRect(vec2 p, vec2 b, float r) {
         vec2 q = abs(p) - (b - vec2(r));
         return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
       }
+      
 
       void main() {
         float r = clamp(vRadius, 0.0, min(vHalfSize.x, vHalfSize.y));
@@ -89,6 +96,23 @@ export class InstancedRoundedRectManager extends WebGLManager {
         float fillMask = 1.0 - smoothstep(-bw, -bw + aa, d);
         fillMask = clamp(fillMask, 0.0, 1.0);
         float borderMask = clamp(shapeCov - fillMask, 0.0, 1.0);
+        
+        // Optional dash pattern on the border: single value => equal dash & gap
+        if (vDashLength > 0.0 && borderMask > 0.0) {
+          // Simple per-edge dash: alternate along primary tangent axis
+          float period = max(vDashLength * 2.0, 1e-3);
+          vec2 a = abs(vLocal);
+          vec2 h = vHalfSize;
+          float dx = h.x - a.x;
+          float dy = h.y - a.y;
+          // 1.0 => vertical sides (left/right), 0.0 => horizontal sides (top/bottom)
+          float isVertical = step(dx, dy);
+          float t = mix(a.x, a.y, isVertical);
+          float w = max(fwidth(t), 1e-4);
+          float m = mod(t, period);
+          float dashAlpha = 1.0 - smoothstep(vDashLength, vDashLength + w, m);
+          borderMask *= dashAlpha;
+        }
         if (shapeCov <= 0.0) discard;
 
         // Porter-Duff: border over fill, to avoid fill tinting border
@@ -147,12 +171,14 @@ export class InstancedRoundedRectManager extends WebGLManager {
     this.aBorderWidth = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
     this.aFillColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.aBorderColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
+    this.aDashLength = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
 
     geom.setAttribute('aSize', this.aSize);
     geom.setAttribute('aRadius', this.aRadius);
     geom.setAttribute('aBorderWidth', this.aBorderWidth);
     geom.setAttribute('aFillColor', this.aFillColor);
     geom.setAttribute('aBorderColor', this.aBorderColor);
+    geom.setAttribute('aDashLength', this.aDashLength);
 
     const material = this.createMaterial();
     const mesh = new THREE.InstancedMesh(geom, material, capacity);
@@ -177,7 +203,8 @@ export class InstancedRoundedRectManager extends WebGLManager {
       !this.aRadius ||
       !this.aBorderWidth ||
       !this.aFillColor ||
-      !this.aBorderColor
+      !this.aBorderColor ||
+      !this.aDashLength
     ) {
       return;
     }
@@ -188,6 +215,7 @@ export class InstancedRoundedRectManager extends WebGLManager {
     this.aBorderWidth.setX(index, data.borderWidth);
     this.aFillColor.setXYZW(index, data.fillR, data.fillG, data.fillB, data.fillA);
     this.aBorderColor.setXYZW(index, data.borderR, data.borderG, data.borderB, data.borderA);
+    this.aDashLength.setX(index, data.dashLength ?? 0);
 
     // instance matrix: scale + translation
     const translation = new THREE.Vector3(data.centerX, data.centerY, data.z);
@@ -205,7 +233,8 @@ export class InstancedRoundedRectManager extends WebGLManager {
       !this.aRadius ||
       !this.aBorderWidth ||
       !this.aFillColor ||
-      !this.aBorderColor
+      !this.aBorderColor ||
+      !this.aDashLength
     ) {
       return;
     }
@@ -214,6 +243,7 @@ export class InstancedRoundedRectManager extends WebGLManager {
     this.aBorderWidth.needsUpdate = true;
     this.aFillColor.needsUpdate = true;
     this.aBorderColor.needsUpdate = true;
+    this.aDashLength.needsUpdate = true;
     this.mesh.instanceMatrix.needsUpdate = true;
   }
 
