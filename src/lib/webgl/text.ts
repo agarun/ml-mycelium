@@ -81,7 +81,6 @@ export class TextManager extends WebGLManager {
   }
 
   updateVisibility(camera: THREE.Camera, currentScale: number): void {
-    // Ensure camera matrices are up to date
     camera.updateMatrixWorld(false);
 
     this.projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
