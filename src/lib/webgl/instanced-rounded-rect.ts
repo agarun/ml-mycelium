@@ -12,7 +12,7 @@ export interface RoundedRectInstance {
   height: number;
   radius: number;
   borderWidth: number;
-  dashLength?: number; // 0 or undefined => solid
+  dashLength?: number | undefined; // 0 or undefined => solid
   fillR: number;
   fillG: number;
   fillB: number;
