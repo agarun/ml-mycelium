@@ -82,10 +82,10 @@ export class RectManager {
       this.rects.set(key, geometry);
       // simple FIFO eviction to prevent unbounded growth
       if (this.rects.size > RectManager.MAX_CACHE_SIZE) {
-        const firstKey = this.rects.keys().next().value as string | undefined;
+        const firstKey = this.rects.keys().next().value;
         if (firstKey) {
-          const geom = this.rects.get(firstKey);
-          if (geom) geom.dispose();
+          const geometry = this.rects.get(firstKey);
+          if (geometry) geometry.dispose();
           this.rects.delete(firstKey);
         }
       }

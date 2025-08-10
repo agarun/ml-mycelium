@@ -16,7 +16,7 @@ import { WebGLManager } from './webgl';
 import { SceneManager } from './scene';
 import { ExpandedModuleManager } from './expanded-module';
 import { RectManager } from './rect';
-import { InstancedRoundedRectManager, type RoundedRectInstance } from './instanced-rounded-rect';
+import { InstancedRectManager, type RoundedRectInstance } from './instanced-rect';
 
 interface DisplayObjectHashResult {
   type: 'text' | 'container' | 'unknown';
@@ -121,6 +121,7 @@ export class NodeManager extends WebGLManager {
   private sceneManager: SceneManager;
   private textManager: TextManager;
   private rectManager: RectManager;
+  private instancedRects: InstancedRectManager;
   private expandedModuleManager: ExpandedModuleManager;
   private badgeManager: BadgeManager;
 
@@ -129,7 +130,6 @@ export class NodeManager extends WebGLManager {
   private meshes: Map<NodeId, THREE.Mesh>;
   private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
-  private instancedRects: InstancedRoundedRectManager;
   private nodeIdToInstanceIndex: Map<NodeId, number>;
   private instanceIndexToNodeId: Map<number, NodeId>;
   private nodeIdToBaseBorderColor: Map<NodeId, string>;
@@ -150,6 +150,7 @@ export class NodeManager extends WebGLManager {
     // Reuse SceneManager's TextManager for centralized visibility control
     this.textManager = this.sceneManager.getTextManager();
     this.rectManager = new RectManager();
+    this.instancedRects = new InstancedRectManager();
     this.expandedModuleManager = new ExpandedModuleManager(
       this.sceneManager,
       this.textManager,
@@ -162,7 +163,6 @@ export class NodeManager extends WebGLManager {
     this.meshes = new Map();
     this.borders = new Map();
     this.contentGroups = new Map();
-    this.instancedRects = new InstancedRoundedRectManager();
     this.nodeIdToInstanceIndex = new Map();
     this.instanceIndexToNodeId = new Map();
     this.nodeIdToBaseBorderColor = new Map();

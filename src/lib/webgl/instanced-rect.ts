@@ -12,7 +12,7 @@ export interface RoundedRectInstance {
   height: number;
   radius: number;
   borderWidth: number;
-  dashLength?: number | undefined; // 0 or undefined => solid
+  dashLength?: number | undefined; // when it's 0 or undefined -> solid
   fillR: number;
   fillG: number;
   fillB: number;
@@ -23,7 +23,7 @@ export interface RoundedRectInstance {
   borderA: number;
 }
 
-export class InstancedRoundedRectManager extends WebGLManager {
+export class InstancedRectManager extends WebGLManager {
   public mesh: THREE.InstancedMesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null = null;
   private instanceCount = 0;
   private capacity = 0;

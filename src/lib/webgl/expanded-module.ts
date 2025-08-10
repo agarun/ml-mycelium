@@ -97,6 +97,7 @@ export class ExpandedModuleManager extends WebGLManager {
       fontSize: 16,
       font: Theme.font.family,
       fontWeight: Theme.font.weight.regular,
+      foregroundColor: Theme.colors.foreground.gray,
     });
     textMesh.anchorX = 'left';
     textMesh.anchorY = 'top';
