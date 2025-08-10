@@ -378,36 +378,65 @@ export class NodeManager extends WebGLManager {
       const originalBB = entity.boundingBox();
       const decoration = decorations.get(nodeId);
 
-      // Colors and border from options/decorations
+      // Frame defaults should mirror SVG Node.svelte frame
       let bgColor = entity.options.backgroundColor || Theme.colors.white;
       if (decoration?.backgroundColor) bgColor = decoration.backgroundColor;
       let borderColor = entity.options.borderColor || Theme.colors.foreground.grayTertiary;
       if (decoration?.borderColor) borderColor = decoration.borderColor;
       let borderWidth = 1;
       if (decoration?.borderWidth !== undefined) borderWidth = decoration.borderWidth;
+      let radius = 6;
+      if (decoration?.radius !== undefined) radius = decoration.radius;
+      // Dash: single value interpreted as dash length with equal gap
+      const dashLength = decoration?.borderDash ?? entity.options.borderDash ?? undefined;
 
       // Store base border values for later state updates
       this.nodeIdToBaseBorderColor.set(nodeId, borderColor);
       this.nodeIdToBaseBorderWidth.set(nodeId, borderWidth);
 
-      const fill = new THREE.Color().setStyle(bgColor);
-      const border = new THREE.Color().setStyle(borderColor);
+      // Parse colors; honor 'none' by using alpha 0
+      let fill = new THREE.Color(0x000000);
+      let fillA = 1;
+      if (bgColor === 'none') {
+        fillA = 0;
+      } else {
+        try {
+          fill.setStyle(bgColor);
+        } catch {
+          fill.set(0x000000);
+          fillA = 0; // fail closed transparent
+        }
+      }
+
+      let border = new THREE.Color(0x000000);
+      let borderA = 1;
+      if (borderColor === 'none' || borderWidth <= 0) {
+        borderA = 0;
+      } else {
+        try {
+          border.setStyle(borderColor);
+        } catch {
+          border.set(0x000000);
+          borderA = 0;
+        }
+      }
       const inst: RoundedRectInstance = {
         centerX: originalBB.center.x,
         centerY: originalBB.center.y,
         z: 0,
         width: originalBB.width,
         height: originalBB.height,
-        radius: 8,
+        radius,
         borderWidth,
+        dashLength,
         fillR: fill.r,
         fillG: fill.g,
         fillB: fill.b,
-        fillA: 1,
+        fillA: fillA,
         borderR: border.r,
         borderG: border.g,
         borderB: border.b,
-        borderA: 1,
+        borderA: borderA,
       };
       this.instancedRects.setInstance(instanceIndex, inst);
       // Set userData on the instanced mesh once for picking clarity
