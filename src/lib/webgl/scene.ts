@@ -82,7 +82,6 @@ export class SceneManager {
 
   // Hide text when zoomed out and when off-screen to improve performance
   public updateTextVisibility(camera: THREE.Camera, currentScale: number): void {
-    // Defer to TextManager which tracks instances
     this.textManager.updateVisibility(camera, currentScale);
   }
 

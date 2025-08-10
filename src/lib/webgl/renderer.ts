@@ -7,7 +7,7 @@ import { ThreePerf } from 'three-perf';
 
 export class RendererManager {
   public renderer: THREE.WebGLRenderer;
-  private perf: ThreePerf;
+  private perf: ThreePerf | undefined;
   private viewport: Viewport;
 
   constructor(canvas: HTMLCanvasElement, viewport: Viewport) {
@@ -21,17 +21,20 @@ export class RendererManager {
     });
     this.renderer.sortObjects = false;
     this.updateSize();
-    this.perf = new ThreePerf({
-      anchorX: 'left',
-      anchorY: 'top',
-      domElement: document.body, // or other canvas rendering wrapper
-      renderer: this.renderer, // three js renderer instance you use for rendering
-      memory: true,
-      showGraph: true,
-      scale: 3,
-      backgroundOpacity: 1,
-      visible: true,
-    });
+
+    if (import.meta.env.DEV) {
+      this.perf = new ThreePerf({
+        anchorX: 'left',
+        anchorY: 'top',
+        domElement: document.body,
+        renderer: this.renderer,
+        memory: true,
+        showGraph: true,
+        scale: 3,
+        backgroundOpacity: 1,
+        visible: true,
+      });
+    }
   }
 
   updateSize(): void {
@@ -48,9 +51,9 @@ export class RendererManager {
   }
 
   render(scene: THREE.Scene, camera: THREE.Camera): void {
-    this.perf.begin();
+    if (this.perf) this.perf.begin();
     this.renderer.render(scene, camera);
-    this.perf.end();
+    if (this.perf) this.perf.end();
   }
 
   dispose(): void {

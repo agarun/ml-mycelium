@@ -33,8 +33,6 @@ export class InstancedRoundedRectManager extends WebGLManager {
   private aFillColor: THREE.InstancedBufferAttribute | null = null; // vec4
   private aBorderColor: THREE.InstancedBufferAttribute | null = null; // vec4
 
-  // default constructor is sufficient
-
   private createMaterial(): THREE.ShaderMaterial {
     const vertexShader = `
       attribute vec2 aSize;
@@ -114,14 +112,11 @@ export class InstancedRoundedRectManager extends WebGLManager {
     });
     material.side = THREE.DoubleSide;
     material.toneMapped = false;
-    // enable standard derivatives for fwidth AA
-    // @ts-expect-error types don't expose this flag directly
+    // @ts-expect-error types are missing, but enabled standard derivatives for fwidth AA
     material.extensions = { ...material.extensions, derivatives: true };
-    // ensure instanceMatrix attribute is bound for InstancedMesh
-    material.defines = { ...(material.defines || {}) } as Record<string, unknown>;
     material.uniforms = {
       uBorderScale: { value: 1.4 },
-    } as unknown as { [uniform: string]: THREE.IUniform };
+    };
     this.registerDisposable(material);
     return material;
   }
@@ -137,10 +132,7 @@ export class InstancedRoundedRectManager extends WebGLManager {
 
     this.capacity = capacity;
 
-    // Base quad geometry [-0.5, 0.5]
-    // Base quad centered at origin in unit space; we scale per instance in VS
     const geom = new THREE.PlaneGeometry(1, 1, 1, 1).toNonIndexed();
-    // Provide a default UV in [-0.5,0.5] for nicer local coords if needed
     const pos = geom.getAttribute('position') as THREE.BufferAttribute;
     const uv = new Float32Array(pos.count * 2);
     for (let i = 0; i < pos.count; i++) {
@@ -186,19 +178,15 @@ export class InstancedRoundedRectManager extends WebGLManager {
       !this.aBorderWidth ||
       !this.aFillColor ||
       !this.aBorderColor
-    )
+    ) {
       return;
+    }
     if (index >= this.capacity) throw new Error('instance index out of range');
 
-    // aSize
     this.aSize.setXY(index, data.width, data.height);
-    // aRadius
     this.aRadius.setX(index, data.radius);
-    // aBorderWidth
     this.aBorderWidth.setX(index, data.borderWidth);
-    // aFillColor
     this.aFillColor.setXYZW(index, data.fillR, data.fillG, data.fillB, data.fillA);
-    // aBorderColor
     this.aBorderColor.setXYZW(index, data.borderR, data.borderG, data.borderB, data.borderA);
 
     // instance matrix: scale + translation
@@ -218,8 +206,9 @@ export class InstancedRoundedRectManager extends WebGLManager {
       !this.aBorderWidth ||
       !this.aFillColor ||
       !this.aBorderColor
-    )
+    ) {
       return;
+    }
     this.aSize.needsUpdate = true;
     this.aRadius.needsUpdate = true;
     this.aBorderWidth.needsUpdate = true;

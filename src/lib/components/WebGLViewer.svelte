@@ -302,7 +302,6 @@
     if (!cameraManager) return;
     shouldRender = false;
     animationFrameId = null;
-    // Update text visibility before rendering to avoid layout thrash
     sceneManager.updateTextVisibility(cameraManager.camera, viewport.scale());
     rendererManager.render(sceneManager.scene, cameraManager.camera);
   }
