@@ -5,11 +5,11 @@ import * as THREE from 'three';
 import type { NodeId } from '$lib/network';
 import type { IDrawableNetwork } from '$lib/layout';
 import type { IRectOptions } from '$lib/ui';
-import type { INodeOptions } from '$lib/ui/node';
 import type { ITextOptions } from '$lib/ui/text';
 import { Theme } from '$lib/ui';
 import { DisplayObject, Container } from '$lib/scene';
 import { TextDisplayObject } from '$lib/ui/text';
+import { RectDisplayObject } from '$lib/ui/rect';
 import { Transform } from '$lib/geometry';
 import { TextManager } from './text';
 import { WebGLManager } from './webgl';
@@ -395,7 +395,7 @@ export class NodeManager extends WebGLManager {
       this.nodeIdToBaseBorderWidth.set(nodeId, borderWidth);
 
       // Parse colors; honor 'none' by using alpha 0
-      let fill = new THREE.Color(0x000000);
+      const fill = new THREE.Color(0x000000);
       let fillA = 1;
       if (bgColor === 'none') {
         fillA = 0;
@@ -408,7 +408,7 @@ export class NodeManager extends WebGLManager {
         }
       }
 
-      let border = new THREE.Color(0x000000);
+      const border = new THREE.Color(0x000000);
       let borderA = 1;
       if (borderColor === 'none' || borderWidth <= 0) {
         borderA = 0;
@@ -504,6 +504,53 @@ export class NodeManager extends WebGLManager {
       );
       text.sync(); // Sync after modifying position
       parent.add(text);
+    } else if (displayObject instanceof RectDisplayObject) {
+      // RectDisplayObject is used by UI builders like `Separator` inside a Node's content.
+      // SVG viewer renders separators as 1px-high rects interspersed between contents.
+      // This branch mirrors that behavior in WebGL by drawing a thin filled rect and,
+      // if provided, an optional stroked outline (rare for separators, typically none).
+      const { width, height } = displayObjectBB;
+      const { backgroundColor, borderColor, borderWidth, radius } = displayObject.options;
+
+      // Fill
+      if (backgroundColor !== 'none') {
+        const fillGeom = this.rectManager.render(width, height, radius ?? 0);
+        const fillMat = new THREE.MeshBasicMaterial({
+          color: backgroundColor,
+          transparent: true,
+          opacity: 1,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: false,
+        });
+        const fillMesh = new THREE.Mesh(fillGeom, fillMat);
+        fillMesh.position.set(
+          displayObjectPosX + width / 2,
+          displayObjectPosY + height / 2,
+          currentRelativeZ,
+        );
+        parent.add(fillMesh);
+      }
+
+      // Border
+      if (borderWidth > 0 && borderColor !== 'none') {
+        const borderGeom = this.rectManager.render(width, height, radius ?? 0, borderWidth);
+        const borderMat = new THREE.MeshBasicMaterial({
+          color: borderColor,
+          transparent: true,
+          opacity: 1,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: false,
+        });
+        const borderMesh = new THREE.Mesh(borderGeom, borderMat);
+        borderMesh.position.set(
+          displayObjectPosX + width / 2,
+          displayObjectPosY + height / 2,
+          currentRelativeZ + 0.0001, // nudge to avoid z-fighting with fill
+        );
+        parent.add(borderMesh);
+      }
     } else if (displayObject instanceof Container) {
       const containerGroup = new THREE.Group();
       containerGroup.position.set(displayObjectPosX, displayObjectPosY, currentRelativeZ);
