@@ -125,10 +125,6 @@ export class NodeManager extends WebGLManager {
   private expandedModuleManager: ExpandedModuleManager;
   private badgeManager: BadgeManager;
 
-  private materials: Map<string, THREE.MeshBasicMaterial>;
-  private geometries: Map<string, THREE.BufferGeometry>;
-  private meshes: Map<NodeId, THREE.Mesh>;
-  private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
 
   private nodeIdToInstanceIndex: Map<NodeId, number>;
@@ -157,11 +153,6 @@ export class NodeManager extends WebGLManager {
       this.rectManager,
     );
     this.badgeManager = new BadgeManager(this.sceneManager, this.textManager);
-
-    this.materials = new Map();
-    this.geometries = new Map();
-    this.meshes = new Map();
-    this.borders = new Map();
     this.contentGroups = new Map();
 
     this.nodeIdToInstanceIndex = new Map();
@@ -250,36 +241,10 @@ export class NodeManager extends WebGLManager {
     this.instanceIndexToNodeId.clear();
     this.nodeIdToBaseBorderColor.clear();
     this.nodeIdToBaseBorderWidth.clear();
-    for (const mesh of this.meshes.values()) {
-      this.sceneManager.scene.remove(mesh);
-      mesh.geometry.dispose();
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((material: THREE.Material) => {
-          material.dispose();
-        });
-      } else {
-        mesh.material.dispose();
-      }
-    }
-    this.meshes.clear();
-
-    for (const border of this.borders.values()) {
-      this.sceneManager.scene.remove(border);
-      border.geometry.dispose();
-      if (Array.isArray(border.material)) {
-        border.material.forEach((material: THREE.Material) => {
-          material.dispose();
-        });
-      } else {
-        border.material.dispose();
-      }
-    }
-    this.borders.clear();
 
     for (const group of this.contentGroups.values()) {
       this.sceneManager.scene.remove(group);
       group.traverse((object) => {
-        // Don't dispose Text objects - TextManager handles that
         if ('geometry' in object && object.geometry) {
           const geometry = object.geometry as THREE.BufferGeometry;
           geometry.dispose();
@@ -314,10 +279,9 @@ export class NodeManager extends WebGLManager {
     const currentSelectedIds = new Set(this.selectedNodeIds);
     const currentHoveredId = this.hoveredNodeId;
 
-    const moduleNestingLevels = new Map<NodeId, number>();
+    const moduleNestingLevels: Map<NodeId, number> = new Map();
     const moduleParents = new Map<NodeId, NodeId>();
 
-    // Find all parent-child relationships between modules
     for (const [nodeId, module] of drawable.expanded) {
       const moduleBB = module.boundingBox;
       for (const [otherId, otherModule] of drawable.expanded) {
@@ -343,18 +307,14 @@ export class NodeManager extends WebGLManager {
       return level;
     };
 
-    // Calculate nesting levels for all modules
     for (const [nodeId] of drawable.expanded) {
       computeNestingLevel(nodeId);
     }
 
-    // Update expanded modules first (they should be behind nodes)
     for (const [nodeId, module] of drawable.expanded) {
       const originalBB = module.boundingBox;
       const nestingLevel = moduleNestingLevels.get(nodeId) || 0;
-      // Create expanded module with z-index based on nesting level
-      // Higher nesting level = higher z-index (closer to camera)
-      const zIndex = -0.5 + nestingLevel * 0.1; // Start at -0.5 and increment by 0.1 for each level
+      const zIndex = -0.5 + nestingLevel * 0.1; // Start at -0.5 and increment by 0.1 per level
       const moduleGroup = this.expandedModuleManager.render(module.name, originalBB, zIndex);
       moduleGroup.position.set(0, 0, 0);
       moduleGroup.userData.nodeId = nodeId;
@@ -379,30 +339,27 @@ export class NodeManager extends WebGLManager {
       const originalBB = entity.boundingBox();
       const decoration = decorations.get(nodeId);
 
-      // Frame defaults should mirror SVG Node.svelte frame
-      let bgColor = entity.options.backgroundColor || Theme.colors.white;
-      if (decoration?.backgroundColor) bgColor = decoration.backgroundColor;
-      let borderColor = entity.options.borderColor || Theme.colors.foreground.grayTertiary;
-      if (decoration?.borderColor) borderColor = decoration.borderColor;
-      let borderWidth = 1;
-      if (decoration?.borderWidth !== undefined) borderWidth = decoration.borderWidth;
-      let radius = 6;
-      if (decoration?.radius !== undefined) radius = decoration.radius;
-      // Dash: single value interpreted as dash length with equal gap
-      const dashLength = decoration?.borderDash ?? entity.options.borderDash ?? undefined;
+      // Frame defaults mirror SVG Node.svelte, merged with decoration
+      const frame = {
+        backgroundColor: decoration?.backgroundColor || entity.options.backgroundColor,
+        borderColor: decoration?.borderColor || entity.options.borderColor,
+        borderWidth: decoration?.borderWidth ?? 1,
+        radius: decoration?.radius ?? 6,
+        borderDash: decoration?.borderDash || entity.options.borderDash,
+      } as const;
 
-      // Store base border values for later state updates
-      this.nodeIdToBaseBorderColor.set(nodeId, borderColor);
-      this.nodeIdToBaseBorderWidth.set(nodeId, borderWidth);
+      this.nodeIdToInstanceIndex.set(nodeId, instanceIndex);
+      this.nodeIdToBaseBorderColor.set(nodeId, frame.borderColor);
+      this.nodeIdToBaseBorderWidth.set(nodeId, frame.borderWidth);
 
       // Parse colors; honor 'none' by using alpha 0
       const fill = new THREE.Color(0x000000);
       let fillA = 1;
-      if (bgColor === 'none') {
+      if (frame.backgroundColor === 'none') {
         fillA = 0;
       } else {
         try {
-          fill.setStyle(bgColor);
+          fill.setStyle(frame.backgroundColor);
         } catch {
           fill.set(0x000000);
           fillA = 0; // fail closed transparent
@@ -411,25 +368,26 @@ export class NodeManager extends WebGLManager {
 
       const border = new THREE.Color(0x000000);
       let borderA = 1;
-      if (borderColor === 'none' || borderWidth <= 0) {
+      if (frame.borderColor === 'none' || frame.borderWidth <= 0) {
         borderA = 0;
       } else {
         try {
-          border.setStyle(borderColor);
+          border.setStyle(frame.borderColor);
         } catch {
           border.set(0x000000);
           borderA = 0;
         }
       }
-      const inst: RoundedRectInstance = {
+
+      const instance: RoundedRectInstance = {
         centerX: originalBB.center.x,
         centerY: originalBB.center.y,
         z: 0,
         width: originalBB.width,
         height: originalBB.height,
-        radius,
-        borderWidth,
-        dashLength,
+        radius: frame.radius,
+        borderWidth: frame.borderWidth,
+        dashLength: frame.borderDash,
         fillR: fill.r,
         fillG: fill.g,
         fillB: fill.b,
@@ -439,12 +397,12 @@ export class NodeManager extends WebGLManager {
         borderB: border.b,
         borderA: borderA,
       };
-      this.instancedRectManager.setInstance(instanceIndex, inst);
+      this.instancedRectManager.setInstance(instanceIndex, instance);
       // Set userData on the instanced mesh once for picking clarity
       if (this.instancedRectManager.mesh && !this.instancedRectManager.mesh.userData.kind) {
         this.instancedRectManager.mesh.userData.kind = 'nodeRect';
       }
-      this.nodeIdToInstanceIndex.set(nodeId, instanceIndex);
+      // Reverse lookup for picking
       this.instanceIndexToNodeId.set(instanceIndex, nodeId);
       instanceIndex++;
 
@@ -471,7 +429,7 @@ export class NodeManager extends WebGLManager {
     }
     this.instancedRectManager.end();
 
-    // Reapply states
+    // Reapply interaction states (hover/selection)
     this.selectedNodeIds = currentSelectedIds;
     this.hoveredNodeId = currentHoveredId;
     for (const [nodeId] of this.nodeIdToInstanceIndex) {
@@ -674,14 +632,10 @@ export class NodeManager extends WebGLManager {
     if (instanceIndex === undefined) return;
 
     // Defaults
-    let baseBorderColor: string = Theme.colors.foreground.grayTertiary; // Explicitly typed as string
-    let baseBorderWidth = 1; // Default border width
-
     // Source base values from what we recorded during render()
-    const storedColor = this.nodeIdToBaseBorderColor.get(nodeId);
-    const storedWidth = this.nodeIdToBaseBorderWidth.get(nodeId);
-    if (storedColor) baseBorderColor = storedColor;
-    if (storedWidth !== undefined) baseBorderWidth = storedWidth;
+    const baseBorderColor: string =
+      this.nodeIdToBaseBorderColor.get(nodeId) ?? Theme.colors.foreground.grayTertiary;
+    const baseBorderWidth = this.nodeIdToBaseBorderWidth.get(nodeId) ?? 1;
 
     const { isHovered = false, isSelected = false } = options;
 
@@ -707,16 +661,6 @@ export class NodeManager extends WebGLManager {
   }
 
   dispose(): void {
-    this.materials.clear();
-    for (const material of this.materials.values()) {
-      material.dispose();
-    }
-
-    for (const geometry of this.geometries.values()) {
-      geometry.dispose();
-    }
-    this.geometries.clear();
-
     this.clearNodes();
 
     this.textManager.dispose();
