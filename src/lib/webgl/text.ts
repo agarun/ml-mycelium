@@ -6,14 +6,13 @@ import { Text as TroikaText } from 'troika-three-text';
 import { Theme } from '$lib/ui';
 import { type ITextOptions } from '$lib/ui/text';
 import { WebGLManager } from './webgl';
-import { TEXT_VISIBILITY_SCALE_THRESHOLD } from './webgl';
 
 const FONTS = {
   // https://github.com/protectwise/troika/blob/e43e18f1d4754107136b73ee05c410d160469379/packages/troika-examples/text/TextExample.jsx#L21C12-L21C80
   Roboto: {
-    200: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff',
-    500: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff',
-    600: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff',
+    200: 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff', // link is for `Regular`
+    500: 'https://fonts.gstatic.com/s/roboto/v18/KFOlCnqEu92Fr1MmEU9fBBc-.woff',
+    600: 'https://fonts.gstatic.com/s/roboto/v18/KFOlCnqEu92Fr1MmWUlfBBc-.woff',
   },
   'SF Mono, ui-monospace, monospace': {
     200: 'https://cdn.jsdelivr.net/npm/sf-mono-webfont@1.0.0/sf-mono-light.woff',
@@ -24,16 +23,18 @@ const FONTS = {
 
 export class TextManager extends WebGLManager {
   private texts: Map<string, TroikaText>;
-  private activeInstances: Set<TroikaText>;
+  private instances: Set<TroikaText>;
   private frustum: THREE.Frustum;
-  private projScreenMatrix: THREE.Matrix4;
+  private projectionMatrix: THREE.Matrix4;
+  // When viewport.scale() < TEXT_VISIBILITY_SCALE_THRESHOLD, text will be hidden.
+  private TEXT_VISIBILITY_SCALE_THRESHOLD = 0.2;
 
   constructor() {
     super();
-    this.texts = new Map();
-    this.activeInstances = new Set();
+    this.texts = new Map(); // look-up for all unique text objects
+    this.instances = new Set(); // all instances of text objects, including clones
     this.frustum = new THREE.Frustum();
-    this.projScreenMatrix = new THREE.Matrix4();
+    this.projectionMatrix = new THREE.Matrix4();
   }
 
   private key(text: string, options: ITextOptions, baseColor?: string): string {
@@ -63,7 +64,6 @@ export class TextManager extends WebGLManager {
       textMesh.anchorY = 'middle';
       textMesh.rotation.z = Math.PI;
       textMesh.rotation.y = Math.PI;
-      // mark for visibility gating
       textMesh.userData.isText = true;
       textMesh.sync();
 
@@ -71,34 +71,39 @@ export class TextManager extends WebGLManager {
       this.registerDisposable(textMesh);
     }
 
-    // Any external changes to the cloned mesh will *have* to be `.sync()`ed
+    // NOTE(agarun): Any external changes to the cloned mesh will *have* to be `.sync()`ed
     const clonedMesh = textMesh.clone();
     clonedMesh.userData.isText = true;
-    // track instance for visibility management
-    this.activeInstances.add(clonedMesh);
+    this.instances.add(clonedMesh);
     this.registerDisposable(clonedMesh);
     return clonedMesh;
   }
 
+  /**
+   * Update the visibility of the text instances based on the camera and the current scale of the viewport.
+   * We *do not* show text when zoomed out really far or when off-screen to improve performance.
+   * @param camera - The camera to update the visibility of the text instances
+   * @param currentScale - The current scale of the viewport
+   */
   updateVisibility(camera: THREE.Camera, currentScale: number): void {
     camera.updateMatrixWorld(false);
 
-    this.projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
+    this.projectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.projectionMatrix);
 
-    const isZoomedOut = currentScale < TEXT_VISIBILITY_SCALE_THRESHOLD;
+    const isZoomedOut = currentScale < this.TEXT_VISIBILITY_SCALE_THRESHOLD;
 
-    for (const obj of this.activeInstances) {
+    for (const instance of this.instances) {
       if (isZoomedOut) {
-        obj.visible = false;
+        instance.visible = false;
         continue;
       }
 
       let inFrustum = true;
-      const mesh = obj as unknown as THREE.Mesh;
-      const geom = mesh.geometry as THREE.BufferGeometry | undefined;
-      if (geom && geom.boundingSphere) {
-        const sphere = geom.boundingSphere.clone();
+      const mesh = instance as unknown as THREE.Mesh;
+      const geometry = mesh.geometry as THREE.BufferGeometry | undefined;
+      if (geometry && geometry.boundingSphere) {
+        const sphere = geometry.boundingSphere.clone();
         sphere.applyMatrix4(mesh.matrixWorld);
         inFrustum = this.frustum.intersectsSphere(sphere);
       } else {
@@ -106,16 +111,16 @@ export class TextManager extends WebGLManager {
         mesh.getWorldPosition(worldPos);
         inFrustum = this.frustum.containsPoint(worldPos);
       }
-      obj.visible = inFrustum;
+      instance.visible = inFrustum;
     }
   }
 
   clearInstances(): void {
-    this.activeInstances.clear();
+    this.instances.clear();
   }
 
   dispose(): void {
-    this.activeInstances.clear();
+    this.instances.clear();
     this.texts.clear();
     super.dispose();
   }
