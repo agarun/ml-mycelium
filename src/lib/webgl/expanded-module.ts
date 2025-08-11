@@ -17,7 +17,8 @@ export class ExpandedModuleManager extends WebGLManager {
   private rectManager: RectManager;
   public expandedModules: Map<NodeId, THREE.Group>;
   private material: THREE.MeshBasicMaterial;
-  private borderMaterial: THREE.MeshBasicMaterial;
+  private defaultBorderMaterial: THREE.MeshBasicMaterial;
+  private hoverBorderMaterial: THREE.MeshBasicMaterial;
   private hoveredNodeId: NodeId | undefined;
 
   constructor(sceneManager: SceneManager, textManager: TextManager, rectManager: RectManager) {
@@ -27,15 +28,23 @@ export class ExpandedModuleManager extends WebGLManager {
     this.rectManager = rectManager;
     this.expandedModules = new Map();
     this.material = new THREE.MeshBasicMaterial({
-      color: 'rgb(250,250,250)',
+      color: Theme.colors.background.gray,
       transparent: false,
       opacity: 1,
       side: THREE.DoubleSide,
       depthWrite: false,
       depthTest: false,
     });
-    this.borderMaterial = new THREE.MeshBasicMaterial({
-      color: 'rgb(134, 134, 139)',
+    this.defaultBorderMaterial = new THREE.MeshBasicMaterial({
+      color: Theme.colors.foreground.grayTertiary,
+      transparent: false,
+      opacity: 1,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    });
+    this.hoverBorderMaterial = new THREE.MeshBasicMaterial({
+      color: Theme.colors.foreground.blue,
       transparent: false,
       opacity: 1,
       side: THREE.DoubleSide,
@@ -50,9 +59,7 @@ export class ExpandedModuleManager extends WebGLManager {
       const prevModule = this.expandedModules.get(this.hoveredNodeId);
       if (prevModule) {
         const border = prevModule.children[1] as THREE.Mesh;
-        if (border.material instanceof THREE.MeshBasicMaterial) {
-          border.material.color.set('rgb(134, 134, 139)');
-        }
+        border.material = this.defaultBorderMaterial;
         const text = prevModule.children[2];
         if (text instanceof Text) {
           text.color = Theme.colors.foreground.gray;
@@ -68,9 +75,7 @@ export class ExpandedModuleManager extends WebGLManager {
       const module = this.expandedModules.get(nodeId);
       if (module) {
         const border = module.children[1] as THREE.Mesh;
-        if (border.material instanceof THREE.MeshBasicMaterial) {
-          border.material.color.set(Theme.colors.foreground.blue);
-        }
+        border.material = this.hoverBorderMaterial;
         const text = module.children[2];
         if (text instanceof Text) {
           text.color = Theme.colors.foreground.blue;
@@ -82,6 +87,8 @@ export class ExpandedModuleManager extends WebGLManager {
 
   render(name: string, bb: BoundingBox, zIndex: number = 0): THREE.Group {
     const group = new THREE.Group();
+    // Attach world-space bounding box for fast AABB prefilter during picking
+    group.userData.bb = { xMin: bb.xMin, xMax: bb.xMax, yMin: bb.yMin, yMax: bb.yMax };
 
     const bgGeometry = this.rectManager.render(bb.width, bb.height, 6);
     const bgMesh = new THREE.Mesh(bgGeometry, this.material);
@@ -89,7 +96,7 @@ export class ExpandedModuleManager extends WebGLManager {
     group.add(bgMesh);
 
     const borderGeometry = this.rectManager.render(bb.width, bb.height, 6, 1);
-    const border = new THREE.Mesh(borderGeometry, this.borderMaterial);
+    const border = new THREE.Mesh(borderGeometry, this.defaultBorderMaterial);
     border.position.set(bb.center.x, bb.center.y, zIndex + 0.1);
     group.add(border);
 
@@ -120,7 +127,8 @@ export class ExpandedModuleManager extends WebGLManager {
   dispose(): void {
     this.clear();
     this.material.dispose();
-    this.borderMaterial.dispose();
+    this.defaultBorderMaterial.dispose();
+    this.hoverBorderMaterial.dispose();
     super.dispose();
   }
 }
