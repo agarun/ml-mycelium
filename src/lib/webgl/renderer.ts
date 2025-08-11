@@ -14,7 +14,7 @@ export class RendererManager {
     this.viewport = viewport;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true, // can be disabled if low fps
+      antialias: true,
       alpha: true,
       preserveDrawingBuffer: false,
       powerPreference: 'high-performance',
@@ -38,13 +38,9 @@ export class RendererManager {
   }
 
   updateSize(): void {
-    // Use the Viewport as the single source of truth for renderer size.
-    // This avoids mismatches with canvas attributes and browser zoom DPR.
     const width = Math.max(1, Math.floor(this.viewport.screenWidth()));
     const height = Math.max(1, Math.floor(this.viewport.screenHeight()));
-
-    // Lock pixel ratio to 1 for stability across browser zoom levels.
-    // Improves consistency of projection and raycasting at the cost of HiDPI crispness.
+    // NOTE(agarun): locking DPR to 1 for now but we should support HiDPI
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
   }

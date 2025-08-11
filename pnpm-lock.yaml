@@ -30,6 +30,9 @@ importers:
       three:
         specifier: ^0.177.0
         version: 0.177.0
+      three-perf:
+        specifier: ^1.0.11
+        version: 1.0.11(three@0.177.0)
       troika-three-text:
         specifier: ^0.52.4
         version: 0.52.4(three@0.177.0)
@@ -130,9 +133,6 @@ importers:
       tailwindcss:
         specifier: ^3.4.4
         version: 3.4.17
-      three-perf:
-        specifier: ^1.0.11
-        version: 1.0.11(three@0.177.0)
       tslib:
         specifier: ^2.6.3
         version: 2.8.1
@@ -4423,6 +4423,7 @@ snapshots:
   bidi-js@1.0.3:
     dependencies:
       require-from-string: 2.0.2
+    optional: true
 
   binary-extensions@2.3.0: {}
 
@@ -6184,7 +6185,8 @@ snapshots:
       gopd: 1.2.0
       set-function-name: 2.0.2
 
-  require-from-string@2.0.2: {}
+  require-from-string@2.0.2:
+    optional: true
 
   requires-port@1.0.0:
     optional: true
@@ -6609,8 +6611,10 @@ snapshots:
       three: 0.177.0
       troika-three-text: 0.52.4(three@0.177.0)
       tweakpane: 3.1.10
+    optional: true
 
-  three@0.177.0: {}
+  three@0.177.0:
+    optional: true
 
   tinybench@2.9.0: {}
 
@@ -6651,12 +6655,15 @@ snapshots:
       troika-three-utils: 0.52.4(three@0.177.0)
       troika-worker-utils: 0.52.0
       webgl-sdf-generator: 1.1.1
+    optional: true
 
   troika-three-utils@0.52.4(three@0.177.0):
     dependencies:
       three: 0.177.0
+    optional: true
 
-  troika-worker-utils@0.52.0: {}
+  troika-worker-utils@0.52.0:
+    optional: true
 
   ts-api-utils@2.1.0(typescript@5.8.3):
     dependencies:
@@ -6680,7 +6687,8 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tweakpane@3.1.10: {}
+  tweakpane@3.1.10:
+    optional: true
 
   type-check@0.4.0:
     dependencies:
@@ -6885,7 +6893,8 @@ snapshots:
 
   web-worker@1.5.0: {}
 
-  webgl-sdf-generator@1.1.1: {}
+  webgl-sdf-generator@1.1.1:
+    optional: true
 
   webidl-conversions@3.0.1:
     optional: true

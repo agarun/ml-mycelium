@@ -96,7 +96,6 @@
     "svelte": "^4.2.19",
     "svelte-check": "^3.8.0",
     "tailwindcss": "^3.4.4",
-    "three-perf": "^1.0.11",
     "tslib": "^2.6.3",
     "typedoc": "^0.28.5",
     "typescript": "^5.8.3",
@@ -115,6 +114,7 @@
     "canvas": "^2.11.2",
     "jsdom": "^24.1.0",
     "three": "^0.177.0",
+    "three-perf": "^1.0.11",
     "troika-three-text": "^0.52.4"
   },
   "packageManager": "pnpm@9.9.0"

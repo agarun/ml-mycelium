@@ -121,7 +121,7 @@ export class NodeManager extends WebGLManager {
   private sceneManager: SceneManager;
   private textManager: TextManager;
   private rectManager: RectManager;
-  private instancedRects: InstancedRectManager;
+  private instancedRectManager: InstancedRectManager;
   private expandedModuleManager: ExpandedModuleManager;
   private badgeManager: BadgeManager;
 
@@ -130,6 +130,7 @@ export class NodeManager extends WebGLManager {
   private meshes: Map<NodeId, THREE.Mesh>;
   private borders: Map<NodeId, THREE.Mesh>;
   private contentGroups: Map<NodeId, THREE.Group>;
+
   private nodeIdToInstanceIndex: Map<NodeId, number>;
   private instanceIndexToNodeId: Map<number, NodeId>;
   private nodeIdToBaseBorderColor: Map<NodeId, string>;
@@ -147,10 +148,9 @@ export class NodeManager extends WebGLManager {
   constructor(sceneManager: SceneManager) {
     super();
     this.sceneManager = sceneManager;
-    // Reuse SceneManager's TextManager for centralized visibility control
-    this.textManager = this.sceneManager.getTextManager();
+    this.textManager = this.sceneManager.textManager;
     this.rectManager = new RectManager();
-    this.instancedRects = new InstancedRectManager();
+    this.instancedRectManager = new InstancedRectManager();
     this.expandedModuleManager = new ExpandedModuleManager(
       this.sceneManager,
       this.textManager,
@@ -163,6 +163,7 @@ export class NodeManager extends WebGLManager {
     this.meshes = new Map();
     this.borders = new Map();
     this.contentGroups = new Map();
+
     this.nodeIdToInstanceIndex = new Map();
     this.instanceIndexToNodeId = new Map();
     this.nodeIdToBaseBorderColor = new Map();
@@ -177,7 +178,7 @@ export class NodeManager extends WebGLManager {
 
   get interactiveNodes(): THREE.Object3D[] {
     const items: THREE.Object3D[] = [...this.expandedModuleManager.expandedModules.values()];
-    if (this.instancedRects.mesh) items.push(this.instancedRects.mesh);
+    if (this.instancedRectManager.mesh) items.push(this.instancedRectManager.mesh);
     return items;
   }
 
@@ -242,8 +243,8 @@ export class NodeManager extends WebGLManager {
   }
 
   private clearNodes(): void {
-    if (this.instancedRects.mesh) {
-      this.sceneManager.scene.remove(this.instancedRects.mesh);
+    if (this.instancedRectManager.mesh) {
+      this.sceneManager.scene.remove(this.instancedRectManager.mesh);
     }
     this.nodeIdToInstanceIndex.clear();
     this.instanceIndexToNodeId.clear();
@@ -365,12 +366,12 @@ export class NodeManager extends WebGLManager {
     const allNodes = [...drawable.nodes.entries(), ...drawable.collapsed.entries()];
 
     // Build instanced bg+border batch
-    this.instancedRects.begin(allNodes.length);
+    this.instancedRectManager.begin(allNodes.length);
     if (
-      this.instancedRects.mesh &&
-      !this.sceneManager.scene.children.includes(this.instancedRects.mesh)
+      this.instancedRectManager.mesh &&
+      !this.sceneManager.scene.children.includes(this.instancedRectManager.mesh)
     ) {
-      this.sceneManager.scene.add(this.instancedRects.mesh);
+      this.sceneManager.scene.add(this.instancedRectManager.mesh);
     }
 
     let instanceIndex = 0;
@@ -438,10 +439,10 @@ export class NodeManager extends WebGLManager {
         borderB: border.b,
         borderA: borderA,
       };
-      this.instancedRects.setInstance(instanceIndex, inst);
+      this.instancedRectManager.setInstance(instanceIndex, inst);
       // Set userData on the instanced mesh once for picking clarity
-      if (this.instancedRects.mesh && !this.instancedRects.mesh.userData.kind) {
-        this.instancedRects.mesh.userData.kind = 'nodeRect';
+      if (this.instancedRectManager.mesh && !this.instancedRectManager.mesh.userData.kind) {
+        this.instancedRectManager.mesh.userData.kind = 'nodeRect';
       }
       this.nodeIdToInstanceIndex.set(nodeId, instanceIndex);
       this.instanceIndexToNodeId.set(instanceIndex, nodeId);
@@ -460,19 +461,15 @@ export class NodeManager extends WebGLManager {
 
       if (entity.options.badge) {
         const badgePosition = new THREE.Vector3(originalBB.xMax + 1, originalBB.yMin - 1, 1.0);
-        const _badgeGroup = this.badgeManager.render(
+        this.badgeManager.render(
           nodeId,
           entity.options.badge.color,
           entity.options.badge.text,
           badgePosition,
         );
-        // No need to track text explicitly; TextManager tracks active instances
-        // badgeGroup may include text created by TextManager.render()
       }
-
-      // Remove per-node bg/border meshes; replaced by instancing
     }
-    this.instancedRects.end();
+    this.instancedRectManager.end();
 
     // Reapply states
     this.selectedNodeIds = currentSelectedIds;
@@ -505,10 +502,8 @@ export class NodeManager extends WebGLManager {
       text.sync(); // Sync after modifying position
       parent.add(text);
     } else if (displayObject instanceof RectDisplayObject) {
-      // RectDisplayObject is used by UI builders like `Separator` inside a Node's content.
-      // SVG viewer renders separators as 1px-high rects interspersed between contents.
-      // This branch mirrors that behavior in WebGL by drawing a thin filled rect and,
-      // if provided, an optional stroked outline (rare for separators, typically none).
+      // RectDisplayObject can be used by `ui.Node` builders to render `Separator`s\
+      // as 1px-high rects interspersed between contents.
       const { width, height } = displayObjectBB;
       const { backgroundColor, borderColor, borderWidth, radius } = displayObject.options;
 
@@ -579,14 +574,14 @@ export class NodeManager extends WebGLManager {
     const maxObjectsToTest = 50;
 
     // Always include the instanced rects mesh to enable picking of nodes
-    if (this.instancedRects.mesh) {
-      this.objects[count] = this.instancedRects.mesh;
+    if (this.instancedRectManager.mesh) {
+      this.objects[count] = this.instancedRectManager.mesh;
       count++;
     }
 
     for (let i = 0; i < objects.length && count < maxObjectsToTest; i++) {
       const obj = objects[i];
-      if (this.instancedRects.mesh && obj === this.instancedRects.mesh) continue; // already added
+      if (this.instancedRectManager.mesh && obj === this.instancedRectManager.mesh) continue; // already added
       const distance = obj.position.distanceTo(camera.position);
       if (distance < maxDistance) {
         this.objects[count] = obj;
@@ -602,8 +597,8 @@ export class NodeManager extends WebGLManager {
       for (const hit of intersects) {
         if (
           typeof hit.instanceId === 'number' &&
-          this.instancedRects.mesh &&
-          hit.object === this.instancedRects.mesh
+          this.instancedRectManager.mesh &&
+          hit.object === this.instancedRectManager.mesh
         ) {
           const idx = hit.instanceId;
           const nodeId = this.instanceIndexToNodeId.get(idx);
@@ -703,7 +698,7 @@ export class NodeManager extends WebGLManager {
 
     const border = new THREE.Color().setStyle(finalBorderColor);
     // If hover/selected, push border color only; else restore base
-    this.instancedRects.updateBorder(instanceIndex, finalBorderWidth, {
+    this.instancedRectManager.updateBorder(instanceIndex, finalBorderWidth, {
       r: border.r,
       g: border.g,
       b: border.b,

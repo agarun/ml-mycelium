@@ -115,7 +115,7 @@ export class TextManager extends WebGLManager {
     }
   }
 
-  clearInstances(): void {
+  clear(): void {
     this.instances.clear();
   }
 
