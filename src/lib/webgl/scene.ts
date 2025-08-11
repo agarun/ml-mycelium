@@ -9,23 +9,17 @@ import { BoundingBox } from '$lib/geometry';
 import type { IPoint } from '$lib/geometry';
 import { EdgeManager } from './edge';
 import { NodeManager } from './node';
-// TEXT_VISIBILITY_SCALE_THRESHOLD is used within TextManager; not needed here
 import { TextManager } from './text';
 
 export class SceneManager {
   public scene: THREE.Scene;
+  public textManager: TextManager;
   private nodeManager: NodeManager;
   private edgeManager: EdgeManager;
-  private frustum: THREE.Frustum;
-  private projScreenMatrix: THREE.Matrix4;
-  private textManager: TextManager;
 
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = null;
-    this.frustum = new THREE.Frustum();
-    this.projScreenMatrix = new THREE.Matrix4();
-    // Initialize TextManager before NodeManager so it's available during NodeManager construction
     this.textManager = new TextManager();
     this.nodeManager = new NodeManager(this);
     this.edgeManager = new EdgeManager(this);
@@ -80,7 +74,6 @@ export class SceneManager {
     this.nodeManager.hoverNode(nodeId);
   }
 
-  // Hide text when zoomed out and when off-screen to improve performance
   public updateTextVisibility(camera: THREE.Camera, currentScale: number): void {
     this.textManager.updateVisibility(camera, currentScale);
   }
@@ -89,12 +82,8 @@ export class SceneManager {
     this.nodeManager.selectNodes(nodeIds);
   }
 
-  public getTextManager(): TextManager {
-    return this.textManager;
-  }
-
   dispose(): void {
-    this.textManager.clearInstances();
+    this.textManager.clear();
     this.nodeManager.dispose();
     this.edgeManager.dispose();
 

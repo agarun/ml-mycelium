@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 export class RectManager {
   private rects: Map<string, THREE.BufferGeometry> = new Map();
-  private static readonly MAX_CACHE_SIZE = 2000;
+  private static readonly MAX_CACHE_SIZE = 2500;
 
   private key(
     width: number,
@@ -13,7 +13,6 @@ export class RectManager {
     radius: number,
     borderThickness: number | null = null,
   ): string {
-    // Coalesce sizes to increase geometry reuse
     const w = Math.round(width);
     const h = Math.round(height);
     return `${w}_${h}_${radius}_${borderThickness ?? 'null'}`;
@@ -80,8 +79,8 @@ export class RectManager {
       const curveSegments = 4; // reduce complexity of rounded corners
       const geometry = new THREE.ShapeGeometry(shape, curveSegments);
       this.rects.set(key, geometry);
-      // simple FIFO eviction to prevent unbounded growth
       if (this.rects.size > RectManager.MAX_CACHE_SIZE) {
+        // FIFO eviction
         const firstKey = this.rects.keys().next().value;
         if (firstKey) {
           const geometry = this.rects.get(firstKey);
@@ -90,7 +89,6 @@ export class RectManager {
         }
       }
     }
-
     const rect = this.rects.get(key);
     if (!rect) throw new Error(`could not retrieve geometry for key: ${key}`);
     return rect;

@@ -306,7 +306,7 @@
     rendererManager.render(sceneManager.scene, cameraManager.camera);
   }
 
-  // render on-demand insteaed of continuously
+  // render on-demand instead of continuously
   function requestRender(): void {
     if (!cameraManager) return;
     if (shouldRender) return;
