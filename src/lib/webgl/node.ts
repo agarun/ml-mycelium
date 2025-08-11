@@ -524,30 +524,34 @@ export class NodeManager extends WebGLManager {
     const objects = this.interactiveNodes;
     if (objects.length === 0) return undefined;
 
-    // Pre-filter objects by distance to reduce raycasting workload
-    const maxDistance = 1000;
-
+    // raycast candidates:
+    // - instanced mesh
+    // - prefiltered expanded modules by axis-align bounding box (AABB) containment of the mouse world point
     this.objects.length = 0;
-    let count = 0;
-    const maxObjectsToTest = 50;
-
-    // Always include the instanced rects mesh to enable picking of nodes
     if (this.instancedRectManager.mesh) {
-      this.objects[count] = this.instancedRectManager.mesh;
-      count++;
+      this.objects.push(this.instancedRectManager.mesh);
     }
 
-    for (let i = 0; i < objects.length && count < maxObjectsToTest; i++) {
-      const obj = objects[i];
-      if (this.instancedRectManager.mesh && obj === this.instancedRectManager.mesh) continue; // already added
-      const distance = obj.position.distanceTo(camera.position);
-      if (distance < maxDistance) {
-        this.objects[count] = obj;
-        count++;
+    // Convert NDC to world at z=0 for AABB test
+    const ndc = new THREE.Vector3(this.vec2.x, this.vec2.y, 0);
+    ndc.unproject(camera);
+    for (const obj of objects) {
+      if (this.instancedRectManager.mesh && obj === this.instancedRectManager.mesh) continue;
+      const bb = obj.userData.bb as
+        | { xMin: number; xMax: number; yMin: number; yMax: number }
+        | undefined;
+      if (!bb) {
+        // No BB: include conservatively
+        this.objects.push(obj);
+        continue;
+      }
+      const x = ndc.x;
+      const y = ndc.y;
+      if (x >= bb.xMin && x <= bb.xMax && y >= bb.yMin && y <= bb.yMax) {
+        this.objects.push(obj);
       }
     }
 
-    // Only do precise raycasting on the filtered subset
     const intersects = this.raycaster.intersectObjects(this.objects, true);
 
     if (intersects.length > 0) {
