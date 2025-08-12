@@ -5,8 +5,6 @@ import * as THREE from 'three';
 import type { NodeId } from '$lib/network';
 import type { IDrawableNetwork } from '$lib/layout';
 import type { IRectOptions } from '$lib/ui';
-import { BoundingBox } from '$lib/geometry';
-import type { IPoint } from '$lib/geometry';
 import { EdgeManager } from './edge';
 import { NodeManager } from './node';
 import { TextManager } from './text';
@@ -26,7 +24,6 @@ export class SceneManager {
   }
 
   updateNetwork(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
-    this.computeBoundingBox(drawable);
     this.updateNodes(drawable, decorations);
     this.updateEdges(drawable);
   }
@@ -40,30 +37,6 @@ export class SceneManager {
 
   private updateEdges(drawable: IDrawableNetwork): void {
     this.edgeManager.renderEdges(drawable);
-  }
-
-  private computeBoundingBox(drawable: IDrawableNetwork): void {
-    let allElementsBB = BoundingBox.infinity();
-
-    const allNodes = [...drawable.nodes.values(), ...drawable.collapsed.values()];
-    allNodes.forEach((node) => {
-      allElementsBB = allElementsBB.union(node.boundingBox());
-    });
-
-    drawable.expanded.forEach((module) => {
-      allElementsBB = allElementsBB.union(module.boundingBox);
-    });
-
-    const allEdgePoints: IPoint[] = [];
-    drawable.edges.children.forEach((edge) => {
-      edge.points.forEach((p) => {
-        allEdgePoints.push({ x: p.x, y: p.y });
-      });
-    });
-
-    if (allEdgePoints.length > 0) {
-      allElementsBB = allElementsBB.union(BoundingBox.fromPoints(...allEdgePoints));
-    }
   }
 
   public getNodeAtPoint(point: THREE.Vector2, camera: THREE.Camera): NodeId | undefined {
