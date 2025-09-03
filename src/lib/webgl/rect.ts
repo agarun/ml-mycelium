@@ -78,6 +78,7 @@ export class RectManager {
       const shape = this.rect(width, height, radius, borderThickness);
       const curveSegments = 4; // reduce complexity of rounded corners
       const geometry = new THREE.ShapeGeometry(shape, curveSegments);
+      geometry.userData.__sharedCache = true;
       this.rects.set(key, geometry);
       if (this.rects.size > RectManager.MAX_CACHE_SIZE) {
         // FIFO eviction

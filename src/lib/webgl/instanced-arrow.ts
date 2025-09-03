@@ -18,6 +18,7 @@ export class InstancedArrowManager extends WebGLManager {
     if (this.mesh && capacity <= this.capacity) {
       return;
     } else if (this.mesh) {
+      this.mesh.parent?.remove(this.mesh);
       this.unregisterDisposable(this.mesh.geometry);
       this.mesh.geometry.dispose();
       this.mesh = null;
@@ -57,7 +58,10 @@ export class InstancedArrowManager extends WebGLManager {
   }
 
   dispose(): void {
-    this.mesh = null;
+    if (this.mesh) {
+      this.mesh.parent?.remove(this.mesh);
+      this.mesh = null;
+    }
     this.capacity = 0;
     super.dispose();
   }

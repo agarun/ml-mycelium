@@ -116,6 +116,10 @@ export class TextManager extends WebGLManager {
   }
 
   clear(): void {
+    for (const instance of this.instances) {
+      instance.dispose();
+      this.unregisterDisposable(instance);
+    }
     this.instances.clear();
   }
 

@@ -14,7 +14,7 @@ export class EdgeManager extends WebGLManager {
   private arrowMaterial: THREE.MeshBasicMaterial;
   private edges: THREE.Group;
   private mergedLine: THREE.LineSegments | null = null;
-  private instancedArrows: InstancedArrowManager | null = null;
+  private instancedArrowManager: InstancedArrowManager | null = null;
   private sceneManager: SceneManager;
   private lastDrawableHash: string | null = null;
 
@@ -51,7 +51,7 @@ export class EdgeManager extends WebGLManager {
 
   private needsUpdate(drawable: IDrawableNetwork): boolean {
     const drawableHash = this.drawableHash(drawable);
-    const didDrawableUpdate = this.lastDrawableHash !== this.drawableHash(drawable);
+    const didDrawableUpdate = this.lastDrawableHash !== drawableHash;
     if (didDrawableUpdate) this.lastDrawableHash = drawableHash;
     return didDrawableUpdate;
   }
@@ -62,19 +62,29 @@ export class EdgeManager extends WebGLManager {
       this.mergedLine.geometry.dispose();
       this.mergedLine = null;
     }
-    if (this.instancedArrows?.mesh) {
-      this.edges.remove(this.instancedArrows.mesh);
+    if (this.instancedArrowManager?.mesh) {
+      this.edges.remove(this.instancedArrowManager.mesh);
     }
     while (this.edges.children.length > 0) {
       const child = this.edges.children[0];
       this.edges.remove(child);
       if ('geometry' in child && child.geometry) {
-        (child.geometry as THREE.BufferGeometry).dispose();
+        const geometry = child.geometry as THREE.BufferGeometry & {
+          userData: { __sharedCache?: boolean };
+        };
+        if (geometry.userData.__sharedCache !== true) {
+          geometry.dispose();
+        }
       }
       if ('material' in child && child.material) {
         const mat = child.material as THREE.Material | THREE.Material[];
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else mat.dispose();
+        if (Array.isArray(mat)) {
+          mat.forEach((m) => {
+            m.dispose();
+          });
+        } else {
+          mat.dispose();
+        }
       }
     }
   }
@@ -104,7 +114,7 @@ export class EdgeManager extends WebGLManager {
       for (const segment of pathSegments) {
         const [x, y] = segment
           .trim()
-          .split(/[\/\s,]+/)
+          .split(/[/\s,]+/)
           .map(Number);
         if (!isNaN(x) && !isNaN(y)) points.push(new THREE.Vector3(x, y, -0.1));
       }
@@ -142,21 +152,31 @@ export class EdgeManager extends WebGLManager {
     }
 
     if (arrowPositions.length > 0) {
-      if (!this.instancedArrows)
-        this.instancedArrows = new InstancedArrowManager(this.arrowMaterial);
-      this.instancedArrows.begin(arrowPositions.length);
-      for (let i = 0; i < arrowPositions.length; i++) {
-        this.instancedArrows.setInstance(i, arrowPositions[i], arrowAngles[i], -0.15);
+      if (!this.instancedArrowManager) {
+        this.instancedArrowManager = new InstancedArrowManager(this.arrowMaterial);
       }
-      this.instancedArrows.end();
-      if (this.instancedArrows.mesh) this.edges.add(this.instancedArrows.mesh);
+
+      this.instancedArrowManager.begin(arrowPositions.length);
+      for (let i = 0; i < arrowPositions.length; i++) {
+        this.instancedArrowManager.setInstance(i, arrowPositions[i], arrowAngles[i], -0.15);
+      }
+      this.instancedArrowManager.end();
+
+      if (this.instancedArrowManager.mesh) {
+        this.edges.add(this.instancedArrowManager.mesh);
+      }
     }
   }
 
   dispose(): void {
+    this.sceneManager.scene.remove(this.edges);
     this.material.dispose();
     this.arrowMaterial.dispose();
     this.clearEdges();
+    if (this.instancedArrowManager) {
+      this.instancedArrowManager.dispose();
+      this.instancedArrowManager = null;
+    }
     super.dispose();
   }
 }

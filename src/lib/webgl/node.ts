@@ -224,8 +224,8 @@ export class NodeManager extends WebGLManager {
     const drawableHash = this.drawableHash(drawable);
     const decorationsHash = this.decorationsHash(decorations);
 
-    const didDrawableUpdate = this.lastDrawableHash !== this.drawableHash(drawable);
-    const didDecorationsUpdate = this.lastDecorationsHash !== this.decorationsHash(decorations);
+    const didDrawableUpdate = this.lastDrawableHash !== drawableHash;
+    const didDecorationsUpdate = this.lastDecorationsHash !== decorationsHash;
 
     if (didDrawableUpdate) this.lastDrawableHash = drawableHash;
     if (didDecorationsUpdate) this.lastDecorationsHash = decorationsHash;
@@ -245,9 +245,14 @@ export class NodeManager extends WebGLManager {
     for (const group of this.contentGroups.values()) {
       this.sceneManager.scene.remove(group);
       group.traverse((object) => {
+        if (object.userData.isText) return;
         if ('geometry' in object && object.geometry) {
-          const geometry = object.geometry as THREE.BufferGeometry;
-          geometry.dispose();
+          const geometry = object.geometry as THREE.BufferGeometry & {
+            userData: { __sharedCache?: boolean };
+          };
+          if (geometry.userData.__sharedCache !== true) {
+            geometry.dispose();
+          }
         }
 
         if ('material' in object && object.material) {
@@ -265,6 +270,7 @@ export class NodeManager extends WebGLManager {
     this.contentGroups.clear();
     this.expandedModuleManager.clear();
     this.badgeManager.clear();
+    this.textManager.clear();
   }
 
   renderNodes(drawable: IDrawableNetwork, decorations: Map<NodeId, Partial<IRectOptions>>): void {
@@ -457,7 +463,7 @@ export class NodeManager extends WebGLManager {
         displayObjectPosY + displayObjectBB.height / 2,
         currentRelativeZ,
       );
-      text.sync(); // Sync after modifying position
+      text.sync();
       parent.add(text);
     } else if (displayObject instanceof RectDisplayObject) {
       // RectDisplayObject can be used by `ui.Node` builders to render `Separator`s\
@@ -669,6 +675,9 @@ export class NodeManager extends WebGLManager {
 
     this.textManager.dispose();
     this.rectManager.dispose();
+    this.instancedRectManager.dispose();
+    this.expandedModuleManager.dispose();
+    this.badgeManager.dispose();
     super.dispose();
   }
 }

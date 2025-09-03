@@ -148,10 +148,19 @@ export class InstancedRectManager extends WebGLManager {
   private ensureCapacity(capacity: number): void {
     if (capacity <= this.capacity && this.mesh) return;
 
-    // Dispose old resources
     if (this.mesh) {
+      this.mesh.parent?.remove(this.mesh);
       this.mesh.geometry.dispose();
+      this.unregisterDisposable(this.mesh.geometry);
       this.mesh.material.dispose();
+      this.unregisterDisposable(this.mesh.material);
+      this.aSize = null;
+      this.aRadius = null;
+      this.aBorderWidth = null;
+      this.aFillColor = null;
+      this.aBorderColor = null;
+      this.aDashLength = null;
+      this.mesh = null;
     }
 
     this.capacity = capacity;
@@ -186,6 +195,22 @@ export class InstancedRectManager extends WebGLManager {
     mesh.frustumCulled = false;
     this.mesh = mesh;
     this.registerDisposable(geom, material);
+  }
+
+  dispose(): void {
+    if (this.mesh) {
+      this.mesh.parent?.remove(this.mesh);
+    }
+    this.aSize = null;
+    this.aRadius = null;
+    this.aBorderWidth = null;
+    this.aFillColor = null;
+    this.aBorderColor = null;
+    this.aDashLength = null;
+    this.mesh = null;
+    this.instanceCount = 0;
+    this.capacity = 0;
+    super.dispose();
   }
 
   begin(instanceCount: number): void {
