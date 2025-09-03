@@ -59,25 +59,6 @@ export class SceneManager {
     this.textManager.clear();
     this.nodeManager.dispose();
     this.edgeManager.dispose();
-
-    this.scene.traverse((object: THREE.Object3D) => {
-      if ('geometry' in object && object.geometry) {
-        const geometry = object.geometry as THREE.BufferGeometry;
-        geometry.dispose();
-      }
-
-      if ('material' in object && object.material) {
-        const material = object.material as THREE.Material | THREE.Material[];
-        if (Array.isArray(material)) {
-          material.forEach((mat: THREE.Material) => {
-            mat.dispose();
-          });
-        } else {
-          material.dispose();
-        }
-      }
-    });
-
     while (this.scene.children.length > 0) {
       const child = this.scene.children[0];
       this.scene.remove(child);

@@ -110,7 +110,6 @@ export class ExpandedModuleManager extends WebGLManager {
     textMesh.anchorY = 'top';
     textMesh.position.set(bb.xMin, bb.yMin - 14, zIndex + 0.2);
     textMesh.sync();
-    this.registerDisposable(textMesh);
     group.add(textMesh);
 
     return group;
